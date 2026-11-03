@@ -1,38 +1,31 @@
 {
-  "name": "simeval-drawing-pilot",
-  "version": "0.1.0",
+  "name": "prj-comparethink-pilot",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test:think-aloud": "node scripts/thinkAloudIntegrity.test.mjs",
-    "test:element-mutations": "node scripts/elementMutationIntegrity.test.mjs",
-    "test:data-collection": "node scripts/dataCollectionIntegrity.test.mjs",
-    "test:agent-batch": "node scripts/agentBatchIntegrity.test.mjs",
-    "test:agent-transforms": "node scripts/agentTransformIntegrity.test.mjs",
-    "test:audra": "node scripts/audraCanonicalIntegrity.test.mjs",
-    "test:audra-driver": "node scripts/audraDriverParserIntegrity.test.mjs",
-    "audra:agent": "node scripts/audraAgentDriver.mjs",
-    "test:audra-export": "node scripts/audraExportIntegrity.test.mjs",
-    "test:audra-scoring-image": "node scripts/audraScoringImageIntegrity.test.mjs",
-    "audra:verify": "node scripts/audraVerifyBundle.mjs"
+    "test": "node --test tests/core.test.mjs",
+    "test:browser": "playwright test",
+    "format:check": "prettier --check src/pilot server tasks tests src/main.tsx vite.config.ts playwright.config.ts scripts/importPlanbench.mjs README.md"
   },
   "dependencies": {
-    "@excalidraw/excalidraw": "^0.17.0",
-    "@google-cloud/speech": "^7.5.0",
-    "@resvg/resvg-js": "^2.6.2",
     "fflate": "^0.8.3",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.2.0",
+    "esbuild": "^0.18.20",
+    "fake-indexeddb": "^6.2.7",
+    "prettier": "^3.9.10",
     "typescript": "^5.5.0",
-    "vite": "^4.5.0",
-    "esbuild": "^0.18.20"
+    "vite": "^4.5.0"
   }
 }

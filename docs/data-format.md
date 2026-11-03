@@ -1,3 +1,5 @@
+> **이전 SimEval 형식 문서입니다.** 현재 CompareThink 파일럿의 데이터 형식과 실행 방법은 [README](../README.md)를 참조하세요.
+
 # Data Format
 
 Export ZIP의 `session.json` 최상위 `schemaVersion`은 `simeval-drawing-session-v4`입니다.
