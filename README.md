@@ -163,6 +163,6 @@ session.json          # 익명 ID, 설정, 과제·모델·앱 버전, 안내 �
 
 OS가 가상 장치 캡처를 지원하는 환경에서는 `PILOT_TEST_AUDIO=native npm run test:browser`로 Chromium의 파일 기반 가상 마이크(getUserMedia 실제 경로)를 사용할 수도 있습니다. 이 macOS 자동화 환경에서는 해당 장치 요청이 대기하여 기본 Web Audio fixture로 검증했습니다. Chrome이 설치되어 있지 않으면 `npx playwright install chromium` 후 `PILOT_TEST_BROWSER=chromium npm run test:browser`를 사용하세요.
 
-기존 SimEval/Excalidraw/Audra 소스와 이전 연구 문서는 이 브랜치에 이력 참고용으로 남아 있습니다. 현재 entrypoint는 `src/pilot/App.tsx`이며 이전 UI/서버 API/테스트는 실행 경로와 TypeScript 빌드 대상에서 제외했습니다. 이전 drawing/STT 의존성도 현재 패키지에서 제거했습니다. 개편 전부터 있던 미커밋 문서/드라이버 수정은 보존했습니다.
+현재 저장소에는 CompareThink 파일럿의 소스·테스트·문서만 유지합니다. 이전 SimEval/Excalidraw/Audra 코드, 드라이버, 테스트, 문서와 자극 파일은 로컬 백업을 검증한 뒤 정리했습니다. 정리 전 커밋은 `f3b5fff`이며, Git에 기록되지 않았던 수정도 별도의 로컬 작업 트리 백업에 포함했습니다. 로컬 백업은 저장소에 포함하지 않습니다. 기존 `exports/`와 `runs/` 실험 결과는 원래 위치에도 보존합니다.
 
 구체적인 실행 결과와 장치 수준 확인 범위는 [검증 기록](docs/comparethink-verification.md)에 정리했습니다.

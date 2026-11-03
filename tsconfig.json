@@ -2,11 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ES2022"
-    ],
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -20,11 +16,5 @@
     "jsx": "react-jsx",
     "resolveJsonModule": true
   },
-  "include": [
-    "src/main.tsx",
-    "src/pilot",
-    "server",
-    "vite.config.ts",
-    "tests/**/*.ts"
-  ]
+  "include": ["src", "server", "vite.config.ts", "tests/**/*.ts"]
 }
