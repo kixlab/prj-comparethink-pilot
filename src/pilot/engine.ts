@@ -1,5 +1,5 @@
 import {
-  instructions,
+  instructionsForTask,
   audioConstraints,
   id,
   errorText,
@@ -28,8 +28,6 @@ export class SessionEngine {
   ending = false;
   recorder: MediaRecorder | null = null;
   stream: MediaStream | null = null;
-  promptDraftId = id();
-  finalDraftId = id();
   private controller: AbortController | null = null;
   private requestDone: Promise<void> | null = null;
   private stopDone: Promise<void> | null = null;
@@ -50,7 +48,13 @@ export class SessionEngine {
       session_id: id(),
       participant_id: participantId,
       config: structuredClone(config),
-      instructions,
+      instructions: instructionsForTask(config.task),
+      collection_policy: {
+        version: "submitted-chat-v1",
+        draft_capture: false,
+        audio: "continuous",
+        timing: "client-observed",
+      },
       clock: {
         origin_utc: new Date(performance.timeOrigin + start).toISOString(),
         performance_time_origin_ms: performance.timeOrigin,
@@ -82,7 +86,11 @@ export class SessionEngine {
       });
     });
     this.journal.enqueue({ session: this.session, create: true });
-    this.log("session_created", { instructions });
+    this.log("session_created", {
+      instructions: this.session.instructions,
+      task_id: config.task.task_id,
+      task_kind: config.task.kind,
+    });
   }
   now() {
     return Math.max(
@@ -343,19 +351,6 @@ export class SessionEngine {
       throw e;
     }
   }
-  draft(
-    field: "prompt" | "final",
-    text: string,
-    metadata: Record<string, unknown>,
-  ) {
-    if (this.session.status !== "active" || this.ending) return;
-    this.log("draft_changed", {
-      field,
-      draft_id: field === "prompt" ? this.promptDraftId : this.finalDraftId,
-      text,
-      ...metadata,
-    });
-  }
   async send(text: string) {
     if (
       !text.trim() ||
@@ -373,14 +368,7 @@ export class SessionEngine {
     this.log("prompt_sent", {
       message_id: userId,
       request_id: requestId,
-      draft_id: this.promptDraftId,
       text,
-    });
-    this.promptDraftId = id();
-    this.log("draft_reset", {
-      field: "prompt",
-      draft_id: this.promptDraftId,
-      reason: "sent",
     });
     const history = this.messages
       .filter((m) => m.role === "user" || m.content)
@@ -391,6 +379,8 @@ export class SessionEngine {
       user_message_id: userId,
       config_id: this.session.config.config_id,
       history_message_ids: this.messages.map((m) => m.message_id),
+      definition:
+        "Client prepares the AI request; dispatch follows local persistence.",
     });
     this.requestIds = { request_id: requestId, message_id: assistantId };
     this.controller = new AbortController();
@@ -412,6 +402,12 @@ export class SessionEngine {
       // Persist the prompt/request boundary before transmitting. Audio never enters this body.
       if (!(await this.journal.flush()))
         throw new Error("Local persistence failed before AI request");
+      if (signal.aborted) throw new Error("Participant stopped response");
+      this.log("ai_request_dispatched", {
+        ...ids,
+        definition:
+          "Client calls fetch to the app server; not model receipt or generation start.",
+      });
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -422,6 +418,12 @@ export class SessionEngine {
           config_id: this.session.config.config_id,
           messages: history,
         }),
+      });
+      this.log("ai_response_headers_received", {
+        ...ids,
+        http_status: response.status,
+        definition:
+          "Client receives HTTP response headers from the app server.",
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -441,9 +443,18 @@ export class SessionEngine {
           typeof event.text === "string" &&
           event.text
         ) {
-          this.log("ai_text_received", { ...ids, text: event.text });
+          const received = this.log("ai_text_received", {
+            ...ids,
+            text: event.text,
+          });
           if (first) {
             first = false;
+            this.log("ai_first_text_received", {
+              ...ids,
+              source_event_id: received.event_id,
+              definition:
+                "Client receives the first non-empty text delta; internal generation start is not observed.",
+            });
             this.log("ai_first_display", {
               ...ids,
               definition:
@@ -516,7 +527,6 @@ export class SessionEngine {
       this.session.final_submitted_t_ms = this.now();
       this.log("final_submitted", {
         text: finalAnswer,
-        draft_id: this.finalDraftId,
       });
     } else
       this.issue("collector", "Participant ended without final submission");

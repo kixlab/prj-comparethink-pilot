@@ -1,0 +1,707 @@
+{
+  "task_id": "travelplanner-validation-row-0",
+  "kind": "travelplanner",
+  "version": "1.0.0",
+  "title": "TravelPlanner itinerary task",
+  "language": "en",
+  "source": {
+    "repository": "https://github.com/OSU-NLP-Group/TravelPlanner",
+    "dataset": "osunlp/TravelPlanner",
+    "path": "validation.csv",
+    "commit": "8736504ecfc31b7f8b7e40122873c337e83fff7c",
+    "url": "https://huggingface.co/datasets/osunlp/TravelPlanner/blob/8736504ecfc31b7f8b7e40122873c337e83fff7c/validation.csv",
+    "file_sha256": "0e54b26b13c0b6d50e8683765e930bffca949488c44634e530da899914d40e80",
+    "instance_id": 0,
+    "identifier": "zero-based CSV row index",
+    "split": "validation",
+    "row_index": 0,
+    "reference_path": "validation_ref_info.jsonl",
+    "reference_file_sha256": "0555348b457226a7cff866a7ec1962b60105fd90bb9e5c030b9e9ec3f2aff1d0",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "Jian Xie, Kai Zhang, Jiangjie Chen, Tinghui Zhu, Renze Lou, Yuandong Tian, Yanghua Xiao, and Yu Su. TravelPlanner: A Benchmark for Real-World Planning with Language Agents. ICML 2024. OSU NLP Group, osunlp/TravelPlanner dataset.",
+    "changes": [
+      "Selected validation CSV row 0 (zero-based), with the identically indexed official JSON reference information.",
+      "Preserved the original query, dates, travel options, and reference values; displayed dataset metadata as trip details.",
+      "Adapted the official sole-planning setting for a human-AI chat study with manual itinerary submission.",
+      "No worked example, annotated plan, reference solution, or evaluation feedback is included.",
+      "This is an adapted research task, not a complete TravelPlanner tool environment or leaderboard evaluation."
+    ]
+  },
+  "description": "Prepare a travel itinerary that meets the request below. You may chat with the AI while working on the task.",
+  "participant_instruction": "Read the travel request and the supplied travel data. You may chat with the AI freely while preparing a day-by-day itinerary. Submit your final itinerary yourself when you are finished.",
+  "query": "Please create a travel plan for me where I'll be departing from Washington and heading to Myrtle Beach for a 3-day trip from March 13th to March 15th, 2022. Can you help me keep this journey within a budget of $1,400?",
+  "trip_details": [
+    {
+      "label": "Departure",
+      "value": "Washington"
+    },
+    {
+      "label": "Destination",
+      "value": "Myrtle Beach"
+    },
+    {
+      "label": "Dates",
+      "value": "2022-03-13, 2022-03-14, 2022-03-15"
+    },
+    {
+      "label": "Duration",
+      "value": "3 days"
+    },
+    {
+      "label": "Travelers",
+      "value": "1"
+    },
+    {
+      "label": "Budget",
+      "value": "$1,400"
+    }
+  ],
+  "reference_notice": "Use the supplied travel options for this task. The dates and prices are fixed benchmark data. All listed options are available to both you and the AI.",
+  "reference_information": {
+    "Attractions in Myrtle Beach": [
+      {
+        "Name": "SkyWheel Myrtle Beach",
+        "Latitude": 33.6940259,
+        "Longitude": -78.87737179999999,
+        "Address": "1110 N Ocean Blvd, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 839-9200",
+        "Website": "http://skywheelmb.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "WonderWorks Myrtle Beach",
+        "Latitude": 33.71682030000001,
+        "Longitude": -78.8843065,
+        "Address": "1313 Celebrity Cir, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 626-9962",
+        "Website": "http://www.wonderworksonline.com/myrtle-beach",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Family Kingdom Amusement Park",
+        "Latitude": 33.682392,
+        "Longitude": -78.89193159999999,
+        "Address": "300 S Ocean Blvd, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 626-3447",
+        "Website": "http://www.familykingdomfun.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Hollywood Wax Museum",
+        "Latitude": 33.7171419,
+        "Longitude": -78.89125729999999,
+        "Address": "1808 21st Ave N unit a, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 444-0091",
+        "Website": "https://www.hollywoodwaxentertainment.com/myrtle-beach-sc-attractions/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Ripley's Aquarium of Myrtle Beach",
+        "Latitude": 33.7157371,
+        "Longitude": -78.8779414,
+        "Address": "1110 Celebrity Cir, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 916-0888",
+        "Website": "https://www.ripleyaquariums.com/myrtlebeach/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Broadway at the Beach",
+        "Latitude": 33.71561730000001,
+        "Longitude": -78.8819491,
+        "Address": "1325 Celebrity Cir, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 444-3200",
+        "Website": "https://www.broadwayatthebeach.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Ripley's Believe It or Not!",
+        "Latitude": 33.69245410000001,
+        "Longitude": -78.8797541,
+        "Address": "901 N Ocean Blvd, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 916-0888",
+        "Website": "http://www.ripleys.com/myrtlebeach",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Ripley's Haunted Adventure",
+        "Latitude": 33.6932294,
+        "Longitude": -78.8789223,
+        "Address": "915 N Ocean Blvd, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 916-0888",
+        "Website": "https://www.ripleys.com/myrtlebeach/haunted-adventure/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Myrtle Beach Boardwalk and Promenade",
+        "Latitude": 33.6932866,
+        "Longitude": -78.87757959999999,
+        "Address": "Myrtle Beach, Myrtle Beach Boardwalk and Promenade, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 918-1000",
+        "Website": "http://www.myrtlebeachdowntown.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Soar + Explore",
+        "Latitude": 33.7166601,
+        "Longitude": -78.8840046,
+        "Address": "1313 Celebrity Cir, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 626-9962",
+        "Website": "http://www.wonderworksonline.com/myrtle-beach/the-experience/soar-explore/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Free Fall Thrill Park",
+        "Latitude": 33.6946055,
+        "Longitude": -78.877455,
+        "Address": "1201 N Ocean Blvd, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 444-8255",
+        "Website": "http://freefallpark.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Ripley's Mirror Maze",
+        "Latitude": 33.6932293,
+        "Longitude": -78.8789223,
+        "Address": "913 N Ocean Blvd, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 916-0888",
+        "Website": "https://www.ripleys.com/myrtlebeach/ripleys-mirror-maze/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Myrtle Beach State Park",
+        "Latitude": 33.6511978,
+        "Longitude": -78.93062499999999,
+        "Address": "4401 S Kings Hwy, Myrtle Beach, SC 29575, USA",
+        "Phone": "(843) 238-5325",
+        "Website": "https://southcarolinaparks.com/myrtle-beach",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Hannah's Maze of Mirrors",
+        "Latitude": 33.71727529999999,
+        "Longitude": -78.8913015,
+        "Address": "1808 21st Ave N Unit C, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 444-0091",
+        "Website": "https://www.hollywoodwaxentertainment.com/myrtle-beach-sc-attractions/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Myrtle Beach Safari (by reservation only)",
+        "Latitude": 33.695161,
+        "Longitude": -78.96923199999999,
+        "Address": "851 Folly Ranch Ln, Myrtle Beach, SC 29588, USA",
+        "Phone": "(843) 361-4552",
+        "Website": "https://docantlesdaysafari.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Dinopark",
+        "Latitude": 33.7154995,
+        "Longitude": -78.8775139,
+        "Address": "1112 Celebrity Cir, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 808-9619",
+        "Website": "http://www.dinoparkmb.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Backstage Mirror Maze",
+        "Latitude": 33.7178823,
+        "Longitude": -78.88289569999999,
+        "Address": "1314 Celebrity Cir #165, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 712-1794",
+        "Website": "http://www.backstagemirrormaze.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "The Pavilion Parks",
+        "Latitude": 33.71561730000001,
+        "Longitude": -78.8819491,
+        "Address": "1325 Celebrity Cir, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 839-0303",
+        "Website": "https://pavilionparks.com/",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Gardens By The Sea",
+        "Latitude": 33.7257741,
+        "Longitude": -78.8380281,
+        "Address": "5506 N Ocean Blvd #5504, Myrtle Beach, SC 29577, USA",
+        "Phone": "Unknown",
+        "Website": "Unknown",
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Pavilion Park",
+        "Latitude": 33.6924413,
+        "Longitude": -78.8816867,
+        "Address": "205 9th Ave N, Myrtle Beach, SC 29577, USA",
+        "Phone": "(843) 839-0303",
+        "Website": "https://pavilionparks.com/",
+        "City": "Myrtle Beach"
+      }
+    ],
+    "Restaurants in Myrtle Beach": [
+      {
+        "Name": "Exotic India",
+        "Average Cost": 81,
+        "Cuisines": "Indian, BBQ, Fast Food",
+        "Aggregate Rating": 4.1,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Catfish Charlie's",
+        "Average Cost": 14,
+        "Cuisines": "Tea, Chinese, Desserts",
+        "Aggregate Rating": 3.3,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "d' Curry House",
+        "Average Cost": 33,
+        "Cuisines": "Tea, Chinese, Desserts, Fast Food",
+        "Aggregate Rating": 3.6,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Twigly",
+        "Average Cost": 55,
+        "Cuisines": "Tea, Bakery, Mediterranean, Seafood",
+        "Aggregate Rating": 4.6,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "First Eat",
+        "Average Cost": 21,
+        "Cuisines": "Tea, Mexican, Fast Food",
+        "Aggregate Rating": 4.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Nagai",
+        "Average Cost": 19,
+        "Cuisines": "Desserts, Pizza, Mexican, Fast Food, American, Seafood",
+        "Aggregate Rating": 4.3,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "La Pino'z Pizza",
+        "Average Cost": 14,
+        "Cuisines": "Cafe, Seafood, Fast Food",
+        "Aggregate Rating": 3.5,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Eat Street Express",
+        "Average Cost": 100,
+        "Cuisines": "Fast Food, Pizza, BBQ, Italian",
+        "Aggregate Rating": 4.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Punjabi Tadka",
+        "Average Cost": 73,
+        "Cuisines": "Bakery, BBQ, Fast Food, Chinese, Seafood",
+        "Aggregate Rating": 2.8,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Kedarnath Prem Chand Halwai",
+        "Average Cost": 61,
+        "Cuisines": "Desserts, Tea, Fast Food, American, Mediterranean, Seafood",
+        "Aggregate Rating": 3.7,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "The Night Owl",
+        "Average Cost": 12,
+        "Cuisines": "Desserts, Tea, American, Bakery, Indian, Seafood",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Negi Restaurant",
+        "Average Cost": 46,
+        "Cuisines": "Tea, Bakery, Pizza, Seafood",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Turning Point Fast Food",
+        "Average Cost": 32,
+        "Cuisines": "Pizza, Seafood",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Cafe Coffee Day - The Lounge",
+        "Average Cost": 71,
+        "Cuisines": "Mexican, Bakery, Desserts, Seafood",
+        "Aggregate Rating": 2.6,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Tapas - Jaypee Vasant Continental",
+        "Average Cost": 90,
+        "Cuisines": "BBQ, Mediterranean, Seafood",
+        "Aggregate Rating": 3.2,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Caravan Resto Bar",
+        "Average Cost": 57,
+        "Cuisines": "Desserts, Tea, BBQ, Mediterranean, Seafood",
+        "Aggregate Rating": 3.2,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Bikaner Restaurant",
+        "Average Cost": 96,
+        "Cuisines": "BBQ, Fast Food",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Rollacious",
+        "Average Cost": 85,
+        "Cuisines": "Desserts, French, Bakery, Indian, Seafood",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Milan Shudh Vaishno",
+        "Average Cost": 97,
+        "Cuisines": "Tea, Bakery, Seafood",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Admission Lounge",
+        "Average Cost": 32,
+        "Cuisines": "BBQ, Desserts, Italian",
+        "Aggregate Rating": 2.7,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Allure",
+        "Average Cost": 71,
+        "Cuisines": "Desserts, Tea, BBQ, Indian, Mediterranean",
+        "Aggregate Rating": 2.8,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Dimsum Vs Sushi",
+        "Average Cost": 83,
+        "Cuisines": "Tea, Desserts, American, BBQ",
+        "Aggregate Rating": 3.4,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Rasoi - The Indian Zaika",
+        "Average Cost": 88,
+        "Cuisines": "Tea, American, BBQ",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "GBar - The Grand New Delhi",
+        "Average Cost": 88,
+        "Cuisines": "Desserts, Italian, Cafe, Indian, Seafood",
+        "Aggregate Rating": 3.3,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Nizam's Kathi Kabab",
+        "Average Cost": 32,
+        "Cuisines": "Desserts, Cafe, Pizza, French, Chinese, Seafood",
+        "Aggregate Rating": 3.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Dakshin Platter",
+        "Average Cost": 56,
+        "Cuisines": "Cafe, Bakery, Italian",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Be Bhukkad",
+        "Average Cost": 96,
+        "Cuisines": "Tea, French, Bakery, BBQ",
+        "Aggregate Rating": 3.6,
+        "City": "Myrtle Beach"
+      },
+      {
+        "Name": "Bread & Pasta",
+        "Average Cost": 37,
+        "Cuisines": "Tea, Desserts, Fast Food",
+        "Aggregate Rating": 0.0,
+        "City": "Myrtle Beach"
+      }
+    ],
+    "Accommodations in Myrtle Beach": [
+      {
+        "NAME": "Cozy Brooklyn Room - Next to Pratt Institute",
+        "price": 418.0,
+        "room type": "Private room",
+        "house_rules": "No smoking & No children under 10 & No pets",
+        "minimum nights": 5.0,
+        "maximum occupancy": 2,
+        "review rate number": 2.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Greenwich Village Apartment",
+        "price": 781.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No parties & No pets",
+        "minimum nights": 3.0,
+        "maximum occupancy": 6,
+        "review rate number": 4.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Studio with Private Terrace on Central Park West",
+        "price": 453.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No smoking & No visitors",
+        "minimum nights": 30.0,
+        "maximum occupancy": 4,
+        "review rate number": 2.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Brooklyn Bliss 3",
+        "price": 953.0,
+        "room type": "Private room",
+        "house_rules": "No visitors",
+        "minimum nights": 2.0,
+        "maximum occupancy": 1,
+        "review rate number": 2.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Bright, renovated apartment close to subway+city",
+        "price": 1131.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No visitors",
+        "minimum nights": 2.0,
+        "maximum occupancy": 10,
+        "review rate number": 3.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Spacious Private Room, lots of character & light",
+        "price": 1087.0,
+        "room type": "Private room",
+        "house_rules": "No parties & No pets",
+        "minimum nights": 1.0,
+        "maximum occupancy": 1,
+        "review rate number": 3.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "A WONDERFUL Place is Waiting 4U in Brooklyn !!!",
+        "price": 160.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No visitors",
+        "minimum nights": 3.0,
+        "maximum occupancy": 2,
+        "review rate number": 3.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Modern & Spacious Apartment in Central Harlem",
+        "price": 1059.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No pets",
+        "minimum nights": 3.0,
+        "maximum occupancy": 9,
+        "review rate number": 3.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Adorable Prospect Heights 1 Bedroom",
+        "price": 107.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No children under 10",
+        "minimum nights": 31.0,
+        "maximum occupancy": 2,
+        "review rate number": 3.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "⭐️Walk + Transit Score 97⭐️8min to Yankee Std⭐️",
+        "price": 1130.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No pets & No smoking",
+        "minimum nights": 2.0,
+        "maximum occupancy": 2,
+        "review rate number": 1.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Williamsburg Domino Park Prime Location 2 bedroom",
+        "price": 461.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No parties",
+        "minimum nights": 7.0,
+        "maximum occupancy": 4,
+        "review rate number": 5.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Private Room in Fort Green BK close to city",
+        "price": 631.0,
+        "room type": "Private room",
+        "house_rules": "No pets & No smoking",
+        "minimum nights": 5.0,
+        "maximum occupancy": 2,
+        "review rate number": 1.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Grande chambre lumineuse à bushwick",
+        "price": 468.0,
+        "room type": "Private room",
+        "house_rules": "No visitors & No children under 10",
+        "minimum nights": 2.0,
+        "maximum occupancy": 1,
+        "review rate number": 4.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Bright & Sunny FULLY FURNISHED Room",
+        "price": 847.0,
+        "room type": "Private room",
+        "house_rules": "No parties & No pets",
+        "minimum nights": 7.0,
+        "maximum occupancy": 2,
+        "review rate number": 5.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Yellow submarine",
+        "price": 179.0,
+        "room type": "Private room",
+        "house_rules": "No pets & No visitors & No children under 10",
+        "minimum nights": 2.0,
+        "maximum occupancy": 2,
+        "review rate number": 5.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Location Angel Boy",
+        "price": 198.0,
+        "room type": "Private room",
+        "house_rules": "No children under 10",
+        "minimum nights": 31.0,
+        "maximum occupancy": 1,
+        "review rate number": 1.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Fabulous bedroom in the heart of BK",
+        "price": 530.0,
+        "room type": "Private room",
+        "house_rules": "No children under 10",
+        "minimum nights": 1.0,
+        "maximum occupancy": 1,
+        "review rate number": 5.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Adorable Polly Pocket-Sized Prospect Heights Space",
+        "price": 397.0,
+        "room type": "Entire home/apt",
+        "house_rules": "No children under 10 & No smoking",
+        "minimum nights": 2.0,
+        "maximum occupancy": 3,
+        "review rate number": 5.0,
+        "city": "Myrtle Beach"
+      },
+      {
+        "NAME": "Great Space in Williamsburg's Heart",
+        "price": 736.0,
+        "room type": "Private room",
+        "house_rules": "No smoking & No pets & No children under 10",
+        "minimum nights": 1.0,
+        "maximum occupancy": 2,
+        "review rate number": 4.0,
+        "city": "Myrtle Beach"
+      }
+    ],
+    "Flight from Washington to Myrtle Beach on 2022-03-13": [
+      {
+        "Flight Number": "F3792603",
+        "Price": 164,
+        "DepTime": "09:19",
+        "ArrTime": "10:59",
+        "ActualElapsedTime": "1 hours 40 minutes",
+        "FlightDate": "2022-03-13",
+        "OriginCityName": "Washington",
+        "DestCityName": "Myrtle Beach",
+        "Distance": 372.0
+      },
+      {
+        "Flight Number": "F3927581",
+        "Price": 89,
+        "DepTime": "11:03",
+        "ArrTime": "13:31",
+        "ActualElapsedTime": "2 hours 28 minutes",
+        "FlightDate": "2022-03-13",
+        "OriginCityName": "Washington",
+        "DestCityName": "Myrtle Beach",
+        "Distance": 372.0
+      }
+    ],
+    "Self-driving from Washington to Myrtle Beach": "self-driving, from Washington to Myrtle Beach, duration: 6 hours 47 mins, distance: 693 km, cost: 34",
+    "Taxi from Washington to Myrtle Beach": "taxi, from Washington to Myrtle Beach, duration: 6 hours 47 mins, distance: 693 km, cost: 693",
+    "Flight from Myrtle Beach to Washington on 2022-03-15": [
+      {
+        "Flight Number": "F3791200",
+        "Price": 87,
+        "DepTime": "11:36",
+        "ArrTime": "13:06",
+        "ActualElapsedTime": "1 hours 30 minutes",
+        "FlightDate": "2022-03-15",
+        "OriginCityName": "Myrtle Beach",
+        "DestCityName": "Washington",
+        "Distance": 372.0
+      },
+      {
+        "Flight Number": "F3926434",
+        "Price": 111,
+        "DepTime": "13:45",
+        "ArrTime": "15:02",
+        "ActualElapsedTime": "1 hours 17 minutes",
+        "FlightDate": "2022-03-15",
+        "OriginCityName": "Myrtle Beach",
+        "DestCityName": "Washington",
+        "Distance": 372.0
+      }
+    ],
+    "Self-driving from Myrtle Beach to Washington": "self-driving, from Myrtle Beach to Washington, duration: 6 hours 45 mins, distance: 693 km, cost: 34",
+    "Taxi from Myrtle Beach to Washington": "taxi, from Myrtle Beach to Washington, duration: 6 hours 45 mins, distance: 693 km, cost: 693"
+  },
+  "final_instruction": "Write and submit your final day-by-day itinerary, including transportation, meals, attractions, and accommodation as applicable. Use the supplied travel data and stay within the requested budget and dates. AI responses are not submitted automatically.",
+  "original": {
+    "query": "Please create a travel plan for me where I'll be departing from Washington and heading to Myrtle Beach for a 3-day trip from March 13th to March 15th, 2022. Can you help me keep this journey within a budget of $1,400?",
+    "fields": {
+      "org": "Washington",
+      "dest": "Myrtle Beach",
+      "days": 3,
+      "date": ["2022-03-13", "2022-03-14", "2022-03-15"],
+      "visiting_city_number": 1,
+      "people_number": 1,
+      "budget": 1400,
+      "level": "easy",
+      "local_constraint": {
+        "house rule": null,
+        "cuisine": null,
+        "room type": null,
+        "transportation": null
+      }
+    }
+  }
+}

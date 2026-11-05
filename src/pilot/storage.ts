@@ -1,15 +1,28 @@
 import type { AudioChunk, RawEvent, Session, Snapshot } from "./types";
+import type { TranscriptionRecord } from "./transcriptionTypes";
 let opening: Promise<IDBDatabase> | undefined;
 export function openDatabase(): Promise<IDBDatabase> {
   if (!opening)
     opening = new Promise((resolve, reject) => {
-      const req = indexedDB.open("comparethink-pilot-v1", 1);
+      const req = indexedDB.open("comparethink-pilot-v1", 2);
       req.onupgradeneeded = () => {
         const db = req.result;
-        db.createObjectStore("sessions", { keyPath: "session_id" });
-        db.createObjectStore("events", { keyPath: ["session_id", "sequence"] });
-        const audio = db.createObjectStore("audio", { keyPath: "chunk_id" });
-        audio.createIndex("session_id", "session_id");
+        if (!db.objectStoreNames.contains("sessions"))
+          db.createObjectStore("sessions", { keyPath: "session_id" });
+        if (!db.objectStoreNames.contains("events"))
+          db.createObjectStore("events", {
+            keyPath: ["session_id", "sequence"],
+          });
+        if (!db.objectStoreNames.contains("audio")) {
+          const audio = db.createObjectStore("audio", { keyPath: "chunk_id" });
+          audio.createIndex("session_id", "session_id");
+        }
+        if (!db.objectStoreNames.contains("transcriptions")) {
+          const transcripts = db.createObjectStore("transcriptions", {
+            keyPath: "entry_id",
+          });
+          transcripts.createIndex("session_id", "session_id");
+        }
       };
       req.onsuccess = () => {
         req.result.onversionchange = () => {
@@ -68,7 +81,83 @@ export async function loadSnapshot(sessionId: string): Promise<Snapshot> {
     ),
   ]);
   if (!session) throw new Error("Session not found.");
-  return { session, events, audio };
+  let transcriptions: TranscriptionRecord[] = [];
+  try {
+    transcriptions = await loadTranscriptions(sessionId);
+  } catch {
+    /* Derived STT storage must never block export of the original recording. */
+  }
+  return {
+    session,
+    events,
+    audio,
+    transcriptions,
+    unsaved_transcription_ids: unsavedTranscriptionIds(sessionId),
+    transcription_read_error: transcriptionReadError(sessionId),
+  };
+}
+
+const transcriptionMemory = new Map<string, TranscriptionRecord>();
+const transcriptionPending = new Set<string>();
+const transcriptionReadErrors = new Map<string, string>();
+export function transcriptionReadError(sessionId: string) {
+  return transcriptionReadErrors.get(sessionId);
+}
+export function unsavedTranscriptionIds(sessionId: string) {
+  return [...transcriptionPending].filter(
+    (id) => transcriptionMemory.get(id)?.session_id === sessionId,
+  );
+}
+export async function loadTranscriptions(sessionId: string) {
+  const cached = () =>
+    [...transcriptionMemory.values()].filter((r) => r.session_id === sessionId);
+  try {
+    const db = await openDatabase();
+    const records = await result<TranscriptionRecord[]>(
+      db
+        .transaction("transcriptions")
+        .objectStore("transcriptions")
+        .index("session_id")
+        .getAll(sessionId),
+    );
+    for (const record of records)
+      if (!transcriptionMemory.has(record.entry_id))
+        transcriptionMemory.set(record.entry_id, record);
+    transcriptionReadErrors.delete(sessionId);
+  } catch (error) {
+    transcriptionReadErrors.set(
+      sessionId,
+      error instanceof Error ? error.message : String(error),
+    );
+    if (!cached().length) throw error;
+  }
+  return cached().sort((a, b) =>
+    a.created_at_utc.localeCompare(b.created_at_utc),
+  );
+}
+export async function saveTranscription(record: TranscriptionRecord) {
+  const prior = transcriptionMemory.get(record.entry_id);
+  if (prior && JSON.stringify(prior) !== JSON.stringify(record))
+    throw new Error(
+      "Transcription records are immutable. Start a new attempt instead.",
+    );
+  if (prior && !transcriptionPending.has(record.entry_id)) return;
+  transcriptionMemory.set(record.entry_id, structuredClone(record));
+  transcriptionPending.add(record.entry_id);
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction("transcriptions", "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onabort = () =>
+      reject(tx.error ?? new Error("Transcript storage failed"));
+    tx.onerror = () => {};
+    tx.objectStore("transcriptions").add(record);
+  });
+  transcriptionPending.delete(record.entry_id);
+}
+export async function retryTranscriptionWrites(sessionId: string) {
+  for (const id of unsavedTranscriptionIds(sessionId))
+    await saveTranscription(transcriptionMemory.get(id)!);
 }
 interface Write {
   session: Session;

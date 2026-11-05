@@ -26,7 +26,10 @@ if (
   throw new Error("Target changed; review the task presentation.");
 const task = {
   task_id: "planbench-blocksworld-task1-instance2",
-  version: "1.1.0",
+  version: "1.2.0",
+  kind: "blocksworld",
+  participant_instruction:
+    "Read the action rules, initial state, and goal. You may chat with the AI freely while working on the action sequence. Submit your final plan yourself when you are finished.",
   title: "Blocksworld planning task",
   language: "en",
   source: {

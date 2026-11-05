@@ -3,7 +3,10 @@ import { createServer } from "vite";
 import { loadTsBundle } from "../scripts/loadTsBundle.mjs";
 import { writeFileSync } from "node:fs";
 const { pilotPlugin } = await loadTsBundle("server/pilotPlugin.ts", "node");
+const { sttPlugin } = await loadTsBundle("server/sttPlugin.ts", "node");
 const requests = [];
+const sttRequests = [];
+let sttMode = "success";
 const enc = new TextEncoder();
 const upstream = async (_, options) => {
   const body = JSON.parse(options.body);
@@ -13,7 +16,13 @@ const upstream = async (_, options) => {
     return new Response("fixture error", { status: 503 });
   const chunks = prompt.includes("FAIL_STREAM")
     ? ["Partial response retained."]
-    : ["I have checked ", "the task rules ", "and current state."];
+    : body.instructions.includes('"kind":"travelplanner"')
+      ? [
+          "I can help prepare ",
+          "a day-by-day itinerary ",
+          "using the supplied travel data.",
+        ]
+      : ["I have checked ", "the task rules ", "and current state."];
   let timer;
   return new Response(
     new ReadableStream({
@@ -109,13 +118,78 @@ const server = await createServer({
   plugins: [
     pilotPlugin(
       { OPENAI_API_KEY: "fixture-key", OPENAI_MODEL: "fixture-model" },
-      "0.2.0-test",
+      "0.4.0-test",
       "browser-test",
       upstream,
+    ),
+    sttPlugin(
+      {
+        STT_PROVIDER: "api",
+        STT_API_BASE_URL: "https://speech.fixture.invalid/v1",
+        STT_API_KEY: "fixture-stt-key",
+        STT_API_MODEL: "fixture-timed-stt",
+        STT_FFMPEG_BIN: process.execPath,
+      },
+      process.cwd(),
+      {
+        transcribe: async (settings, bytes, started, signal) => {
+          sttRequests.push({
+            bytes: bytes.length,
+            started_t_ms: started,
+            provider: settings.configuration.provider,
+          });
+          if (sttMode === "fail") throw new Error("Injected STT failure");
+          if (sttMode === "slow")
+            await new Promise((_, reject) => {
+              if (signal.aborted) reject(new Error("Cancelled"));
+              else
+                signal.addEventListener(
+                  "abort",
+                  () => reject(new Error("Cancelled")),
+                  { once: true },
+                );
+            });
+          return {
+            status: "completed",
+            duration_ms: 2000,
+            cues: [
+              {
+                cue_id: crypto.randomUUID(),
+                text: "먼저 조건을 확인하고 있어요.",
+                audio_start_ms: 300,
+                audio_end_ms: 900,
+                start_t_ms: started + 300,
+                end_t_ms: started + 900,
+              },
+              {
+                cue_id: crypto.randomUUID(),
+                text: "이제 다음 계획을 생각하고 있어요.",
+                audio_start_ms: 1200,
+                audio_end_ms: 1800,
+                start_t_ms: started + 1200,
+                end_t_ms: started + 1800,
+              },
+            ],
+            untimed_text: "",
+            warnings: [],
+            detected_language: "ko",
+            raw_result: { fixture: true },
+          };
+        },
+      },
     ),
     {
       name: "test-request-inspection",
       configureServer(server) {
+        server.middlewares.use("/__test/stt-mode", async (req, res) => {
+          if (req.method === "POST") {
+            let text = "";
+            for await (const chunk of req) text += chunk;
+            sttMode = JSON.parse(text).mode;
+          }
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ mode: sttMode, requests: sttRequests }));
+        });
         server.middlewares.use("/__test/requests", (_, res) => {
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify(requests));

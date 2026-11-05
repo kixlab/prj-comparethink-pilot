@@ -1,8 +1,29 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Configuration, Message, Session, Snapshot } from "./types";
-import { errorText, id, instructions, requestMicrophone } from "./types";
+import type {
+  Configuration,
+  Message,
+  Session,
+  Snapshot,
+  TaskCatalog,
+} from "./types";
+import {
+  errorText,
+  id,
+  instructions,
+  instructionsForTask,
+  requestMicrophone,
+} from "./types";
+import TravelTaskPanel from "./TravelTaskPanel";
 import { SessionEngine } from "./engine";
-import { listSessions, loadSnapshot, openDatabase } from "./storage";
+import SessionReview from "./SessionReview";
+import {
+  listSessions,
+  loadSnapshot,
+  openDatabase,
+  loadTranscriptions,
+  unsavedTranscriptionIds,
+  transcriptionReadError,
+} from "./storage";
 import { buildArchive, downloadArchive, messagesFromEvents } from "./export";
 
 const blockLabels: Record<string, string> = {
@@ -19,6 +40,7 @@ const seconds = (ms: number) =>
     .padStart(2, "0")}`;
 function TaskPanel({ config }: { config: Configuration }) {
   const task = config.task;
+  if (task.kind === "travelplanner") return <TravelTaskPanel task={task} />;
   return (
     <aside className="task-panel">
       <h2>{task.title}</h2>
@@ -123,110 +145,10 @@ function ChatMessage({
     </article>
   );
 }
-function Review({ snapshot }: { snapshot: Snapshot }) {
-  const [url, setUrl] = useState("");
-  const [segmentId, setSegmentId] = useState(
-    snapshot.session.audio_segments[0]?.segment_id ?? "",
-  );
-  const audioEl = useRef<HTMLAudioElement>(null);
-  const [notice, setNotice] = useState("");
-  const segment = snapshot.session.audio_segments.find(
-    (s) => s.segment_id === segmentId,
-  );
-  useEffect(() => {
-    if (!segment) return;
-    const chunks = snapshot.audio
-      .filter((a) => a.segment_id === segmentId)
-      .sort((a, b) => a.index - b.index);
-    const src = URL.createObjectURL(
-      new Blob(
-        chunks.map((c) => c.blob),
-        { type: segment.mime_type },
-      ),
-    );
-    setUrl(src);
-    return () => URL.revokeObjectURL(src);
-  }, [segmentId, snapshot]);
-  const boundaries = snapshot.events.filter((e) =>
-    [
-      "prompt_sent",
-      "ai_first_display",
-      "ai_completed",
-      "ai_failed",
-      "ai_interrupted",
-      "final_submitted",
-    ].includes(e.type),
-  );
-  const labels: Record<string, string> = {
-    prompt_sent: "Prompt sent",
-    ai_first_display: "AI first response",
-    ai_completed: "AI response completed",
-    ai_failed: "AI response failed",
-    ai_interrupted: "AI response interrupted",
-    final_submitted: "Final submission",
-  };
-  const seek = (t: number) => {
-    if (
-      !segment ||
-      t < segment.started_t_ms ||
-      t > (segment.ended_t_ms ?? snapshot.session.last_t_ms) ||
-      snapshot.session.gaps.some(
-        (g) =>
-          g.kind.startsWith("audio") &&
-          t >= g.start_t_ms &&
-          t <= (g.end_t_ms ?? Infinity),
-      )
-    ) {
-      setNotice(
-        "This event falls outside the selected recording or within a recording gap.",
-      );
-      return;
-    }
-    const el = audioEl.current;
-    if (!el) return;
-    el.currentTime = (t - segment.started_t_ms) / 1000;
-    void el.play().catch((e) => setNotice(errorText(e)));
-    setNotice(
-      `${seconds(t)} selected. Timing is approximate due to browser and microphone latency.`,
-    );
-  };
-  return (
-    <section className="review">
-      <h3>Recording review</h3>
-      <p>Select an event to play the recording from that time.</p>
-      {snapshot.session.audio_segments.length > 1 && (
-        <label>
-          Recording segment
-          <select
-            value={segmentId}
-            onChange={(e) => setSegmentId(e.target.value)}
-          >
-            {snapshot.session.audio_segments.map((s, i) => (
-              <option value={s.segment_id} key={s.segment_id}>
-                Segment {i + 1} · {seconds(s.started_t_ms)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {url && <audio ref={audioEl} src={url} controls preload="metadata" />}
-      <div className="event-links">
-        {boundaries.map((e) => (
-          <button
-            className="event-link"
-            key={e.event_id}
-            onClick={() => seek(e.t_ms)}
-          >
-            {seconds(e.t_ms)} <span>{labels[e.type]}</span>
-          </button>
-        ))}
-      </div>
-      {notice && <p role="status">{notice}</p>}
-    </section>
-  );
-}
 export default function App() {
   const [config, setConfig] = useState<Configuration | null>(null);
+  const [catalog, setCatalog] = useState<TaskCatalog | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState("");
   const [phase, setPhase] = useState<"mic" | "guide" | "active" | "done">(
     "mic",
   );
@@ -256,21 +178,59 @@ export default function App() {
       .then(setSaved)
       .catch((e) => setError(`Storage error: ${errorText(e)}`));
   useEffect(() => {
-    void fetch("/api/config")
+    let cancelled = false;
+    void fetch("/api/tasks")
       .then(async (r) => {
-        if (!r.ok) throw new Error("Could not load the server configuration.");
-        return r.json();
+        if (!r.ok) throw new Error("Could not load the available tasks.");
+        return r.json() as Promise<TaskCatalog>;
       })
-      .then(setConfig)
-      .catch((e) => setError(errorText(e)));
+      .then((available) => {
+        if (cancelled) return;
+        setCatalog(available);
+        const requested = new URLSearchParams(window.location.search).get(
+          "task",
+        );
+        const initial = requested
+          ? available.tasks.find(
+              (task) => task.task_id === requested || task.kind === requested,
+            )
+          : available.tasks.find(
+              (task) => task.task_id === available.default_task_id,
+            );
+        if (initial) setSelectedTaskId(initial.task_id);
+        else setError("Unknown task in the URL. Select a task below.");
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errorText(e));
+      });
     void openDatabase()
       .then(refreshSessions)
       .catch((e) => setError(`Storage error: ${errorText(e)}`));
     return () => {
+      cancelled = true;
       const recorder = testRecorder.current;
       if (recorder?.state === "recording") recorder.stop();
     };
   }, []);
+  useEffect(() => {
+    if (!selectedTaskId) return;
+    const controller = new AbortController();
+    setConfig(null);
+    void fetch(`/api/config?task_id=${encodeURIComponent(selectedTaskId)}`, {
+      signal: controller.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load the selected task.");
+        return r.json() as Promise<Configuration>;
+      })
+      .then((selected) => {
+        if (!controller.signal.aborted) setConfig(selected);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(errorText(e));
+      });
+    return () => controller.abort();
+  }, [selectedTaskId]);
   useEffect(() => {
     if (!testUrl) return;
     return () => URL.revokeObjectURL(testUrl);
@@ -460,8 +420,22 @@ export default function App() {
         engine.log("export_requested");
         await engine.journal.flush();
       }
+      const exported = { ...snapshot };
+      try {
+        exported.transcriptions = await loadTranscriptions(
+          snapshot.session.session_id,
+        );
+        exported.transcription_read_error = transcriptionReadError(
+          snapshot.session.session_id,
+        );
+      } catch (e) {
+        exported.transcription_read_error = errorText(e);
+      }
+      exported.unsaved_transcription_ids = unsavedTranscriptionIds(
+        snapshot.session.session_id,
+      );
       const data = await buildArchive(
-        snapshot,
+        exported,
         current ? (engine?.journal.pending.length ?? 0) : 0,
       );
       downloadArchive(data, snapshot.session.session_id);
@@ -474,21 +448,6 @@ export default function App() {
       setWorking(false);
     }
   }
-  const draft = (
-    field: "prompt" | "final",
-    e: React.ChangeEvent<HTMLTextAreaElement>,
-  ) => {
-    const text = e.currentTarget.value;
-    const native = e.nativeEvent as InputEvent;
-    engine?.draft(field, text, {
-      input_type: native.inputType ?? null,
-      is_composing: native.isComposing ?? composing.current,
-      selection_start: e.currentTarget.selectionStart,
-      selection_end: e.currentTarget.selectionEnd,
-    });
-    if (field === "prompt") setPrompt(text);
-    else setFinalAnswer(text);
-  };
   const send = () => {
     if (
       !engine ||
@@ -504,7 +463,7 @@ export default function App() {
     setPrompt("");
     void engine.send(text);
   };
-  const steps = ["Microphone", "Instructions", "Task", "Complete"];
+  const steps = ["Setup", "Instructions", "Task", "Complete"];
   const phaseNumber = { mic: 0, guide: 1, active: 2, done: 3 }[phase];
   return (
     <div className="app-shell">
@@ -543,7 +502,41 @@ export default function App() {
       {phase === "mic" && (
         <main className="onboarding">
           <section className="setup-card">
-            <h1>Microphone check</h1>
+            <h1>Session setup</h1>
+            <label htmlFor="study-task">Task</label>
+            <select
+              id="study-task"
+              aria-label="Task"
+              value={selectedTaskId}
+              disabled={!catalog || working || micState === "recording"}
+              onChange={(e) => {
+                setConfig(null);
+                setError("");
+                setSelectedTaskId(e.target.value);
+                const option = catalog?.tasks.find(
+                  (task) => task.task_id === e.target.value,
+                );
+                const url = new URL(window.location.href);
+                url.searchParams.set("task", option?.kind ?? e.target.value);
+                history.replaceState(null, "", url);
+              }}
+            >
+              {!catalog || !selectedTaskId ? (
+                <option value="">
+                  {catalog ? "Select a task" : "Loading tasks…"}
+                </option>
+              ) : null}
+              {catalog?.tasks.map((task) => (
+                <option key={task.task_id} value={task.task_id}>
+                  {task.title}
+                </option>
+              ))}
+            </select>
+            <p className="task-summary">
+              {catalog?.tasks.find((task) => task.task_id === selectedTaskId)
+                ?.summary ?? ""}
+            </p>
+            <h2>Microphone check</h2>
             <p>
               Record a short sample, then play it back to check that your voice
               is audible.
@@ -636,7 +629,7 @@ export default function App() {
             <div className="instruction-card">
               <div>
                 <h3>Task and chat</h3>
-                <p>{instructions.task}</p>
+                <p>{instructionsForTask(config.task).task}</p>
               </div>
             </div>
             <div className="instruction-card">
@@ -687,6 +680,9 @@ export default function App() {
               <span className="elapsed">{seconds(elapsed)}</span>
             </div>
             <span>Participant: {engine.session.participant_id}</span>
+            <span className="session-task">
+              Task: {engine.session.config.task.title}
+            </span>
             <span className="save-state">
               {engine.journal.blocked
                 ? "Storage error · retained in memory"
@@ -758,21 +754,12 @@ export default function App() {
                   value={prompt}
                   placeholder="Type a message…"
                   disabled={engine.ending}
-                  onChange={(e) => draft("prompt", e)}
+                  onChange={(e) => setPrompt(e.currentTarget.value)}
                   onCompositionStart={() => {
                     composing.current = true;
-                    engine.log("composition_started", {
-                      field: "prompt",
-                      draft_id: engine.promptDraftId,
-                    });
                   }}
-                  onCompositionEnd={(e) => {
+                  onCompositionEnd={() => {
                     composing.current = false;
-                    engine.log("composition_ended", {
-                      field: "prompt",
-                      draft_id: engine.promptDraftId,
-                      text: e.currentTarget.value,
-                    });
                   }}
                   onKeyDown={(e) => {
                     if (
@@ -830,8 +817,12 @@ export default function App() {
                     aria-label="Final plan"
                     rows={6}
                     value={finalAnswer}
-                    onChange={(e) => draft("final", e)}
-                    placeholder="Enter the actions in order."
+                    onChange={(e) => setFinalAnswer(e.currentTarget.value)}
+                    placeholder={
+                      engine.session.config.task.kind === "travelplanner"
+                        ? "Enter your day-by-day itinerary."
+                        : "Enter the actions in order."
+                    }
                   />
                   <button
                     className="primary"
@@ -855,12 +846,32 @@ export default function App() {
       )}
       {phase === "done" && engine && (
         <main className="completion">
-          <h1>Session ended</h1>
-          <p>
-            {engine.session.final_answer
-              ? "Your submitted plan, chat, and recording have been collected."
-              : "The session ended without a final plan submission."}
-          </p>
+          <div className="completion-heading">
+            <div>
+              <h1>Session ended</h1>
+              <p>
+                {engine.session.final_answer
+                  ? "Review your conversation and think-aloud recording below."
+                  : "The session ended without a final plan submission."}
+              </p>
+            </div>
+            <div className="completion-actions">
+              <button
+                className="primary"
+                disabled={working}
+                onClick={() => void exportSession(engine.snapshot, true)}
+              >
+                Download session ZIP
+              </button>
+              <button
+                className="secondary"
+                onClick={() => window.location.reload()}
+                disabled={engine.journal.pending.length > 0}
+              >
+                Prepare a new session
+              </button>
+            </div>
+          </div>
           {engine.journal.blocked && (
             <div className="alert error" role="alert">
               Some data has not been saved and remains in this tab. Keep the tab
@@ -876,22 +887,16 @@ export default function App() {
                 : "Incomplete collection · errors or gaps recorded"}
             </strong>
             <span>
-              {engine.events.length} events · {engine.messages.length} messages
-              · Audio:{" "}
-              {(engine.audio.reduce((n, a) => n + a.size, 0) / 1024).toFixed(1)}{" "}
-              KB
+              Human prompts:{" "}
+              {engine.messages.filter((m) => m.role === "user").length} · AI
+              responses:{" "}
+              {engine.messages.filter((m) => m.role === "assistant").length} ·
+              Recordings: {engine.session.audio_segments.length}
             </span>
             {engine.session.issues.map((issue, i) => (
               <small key={i}>{issue}</small>
             ))}
           </div>
-          <button
-            className="primary"
-            disabled={working}
-            onClick={() => void exportSession(engine.snapshot, true)}
-          >
-            Download session ZIP
-          </button>
           {engine.journal.blocked && (
             <button
               className="secondary"
@@ -900,18 +905,14 @@ export default function App() {
               Retry saving
             </button>
           )}
-          <button
-            className="text-button"
-            onClick={() => window.location.reload()}
-            disabled={engine.journal.pending.length > 0}
-          >
-            Prepare a new session
-          </button>
-          {review && <Review snapshot={review} />}
+          {review && (
+            <SessionReview key={review.session.session_id} snapshot={review} />
+          )}
         </main>
       )}
       {saved.length > 0 && phase !== "active" && (
-        <section className="saved-sessions">
+        <details className="saved-sessions" open={phase !== "done"}>
+          <summary>Saved sessions ({saved.length})</summary>
           <div>
             <h2>Saved sessions</h2>
             <p>
@@ -923,6 +924,7 @@ export default function App() {
             <div className="saved-row" key={s.session_id}>
               <div>
                 <strong>{s.participant_id}</strong>
+                <small>{s.config.task.title}</small>
                 <small>
                   {new Date(s.clock.origin_utc).toLocaleString("en-GB")} ·{" "}
                   {s.session_id.slice(0, 8)} ·{" "}
@@ -956,8 +958,10 @@ export default function App() {
               </button>
             </div>
           ))}
-          {review && phase !== "done" && <Review snapshot={review} />}
-        </section>
+          {review && phase !== "done" && (
+            <SessionReview key={review.session.session_id} snapshot={review} />
+          )}
+        </details>
       )}
       <footer className="page-footer">
         <span>CompareThink research study</span>

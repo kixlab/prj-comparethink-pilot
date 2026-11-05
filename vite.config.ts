@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from "vite";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { pilotPlugin } from "./server/pilotPlugin";
+import { sttPlugin } from "./server/sttPlugin";
 const version = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ).version;
@@ -24,7 +25,11 @@ export default defineConfig(({ mode }) => {
   if (env.PILOT_PUBLIC_ORIGIN)
     allowedHosts.push(new URL(env.PILOT_PUBLIC_ORIGIN).hostname);
   return {
-    plugins: [react(), pilotPlugin(env, version, commit)],
+    plugins: [
+      react(),
+      pilotPlugin(env, version, commit),
+      sttPlugin(env, process.cwd()),
+    ],
     server: { host: "127.0.0.1", allowedHosts },
     preview: { host: "127.0.0.1", allowedHosts },
   };

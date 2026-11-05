@@ -1,15 +1,71 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import task from "../tasks/blocksworld-instance-2.json";
+import {
+  defaultTask,
+  tasks,
+  taskCatalog,
+  taskContext,
+} from "../tasks/registry";
+import type { Task } from "../tasks/types";
 import { readSse } from "../src/pilot/stream";
 import type { Configuration } from "../src/pilot/types";
+
+function connectionSettings(env: Record<string, string | undefined>) {
+  const url = new URL(
+    env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1",
+  );
+  const path = url.pathname.replace(/\/+$/, "");
+  const bedrock =
+    /^bedrock-mantle\.[a-z0-9-]+\.api\.aws$/.test(url.hostname) ||
+    /^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$/.test(url.hostname);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (url.port && url.port !== "443") ||
+    !(bedrock
+      ? ["/v1", "/openai/v1"].includes(path)
+      : url.hostname === "api.openai.com" && path === "/v1")
+  )
+    throw new Error(
+      "OPENAI_BASE_URL must be an official OpenAI or regional Amazon Bedrock HTTPS API base URL",
+    );
+  if (bedrock && !env.OPENAI_MODEL?.trim())
+    throw new Error(
+      "Set OPENAI_MODEL to the Bedrock model or inference profile ID for this endpoint",
+    );
+  const project = env.OPENAI_PROJECT?.trim();
+  if (project && /[\r\n]/.test(project))
+    throw new Error("Invalid OPENAI_PROJECT");
+  return {
+    provider: bedrock ? "bedrock-responses" : "openai-responses",
+    api_base_url: `${url.origin}${path}`,
+    ...(project ? { project } : {}),
+  };
+}
+function apiKeyError(
+  env: Record<string, string | undefined>,
+  provider: string,
+) {
+  const key = env.OPENAI_API_KEY?.trim();
+  if (!key) return "Server OPENAI_API_KEY is not configured";
+  if (provider === "bedrock-responses" && key.startsWith("sk-"))
+    return "Bedrock is configured, but OPENAI_API_KEY still looks like an OpenAI-hosted key. Set it to your Bedrock API key and restart the server.";
+  if (provider === "openai-responses" && key.startsWith("ABSK"))
+    return "OPENAI_API_KEY looks like a Bedrock API key. Set OPENAI_BASE_URL to your regional Bedrock endpoint and restart the server.";
+  return null;
+}
 
 export function makeConfiguration(
   env: Record<string, string | undefined>,
   version: string,
   commit: string,
+  task: Task = defaultTask,
 ): Configuration {
+  const connection = connectionSettings(env);
   const maxTokens = Number(env.OPENAI_MAX_OUTPUT_TOKENS || 4096);
   if (!Number.isInteger(maxTokens) || maxTokens < 1)
     throw new Error("Invalid OPENAI_MAX_OUTPUT_TOKENS");
@@ -26,26 +82,19 @@ export function makeConfiguration(
     generation.reasoning = { effort: env.OPENAI_REASONING_EFFORT };
   const fixed = {
     task,
-    provider: "openai-responses",
-    model: env.OPENAI_MODEL || "gpt-4.1-mini",
+    ...connection,
+    model: env.OPENAI_MODEL?.trim() || "gpt-4.1-mini",
     generation,
     system_prompt:
       "You are collaborating with a participant on the planning task provided below. Respond to their chat in their language. Use only the provided task and conversation. The participant chooses and submits their final answer. Do not claim that a response has been submitted. No reference solution is supplied.\n\n" +
-      JSON.stringify({
-        description: task.description,
-        actions: task.actions,
-        rules: task.rules,
-        initial_state: task.initial_state,
-        goal_state: task.goal_state,
-        final_instruction: task.final_instruction,
-      }),
+      JSON.stringify(taskContext(task)),
     app_version: version,
     app_commit: commit,
   };
   return {
     ...fixed,
     config_id: createHash("sha256").update(JSON.stringify(fixed)).digest("hex"),
-    api_ready: Boolean(env.OPENAI_API_KEY),
+    api_ready: !apiKeyError(env, connection.provider),
   };
 }
 export function providerPayload(config: Configuration, messages: unknown) {
@@ -97,12 +146,19 @@ export function pilotPlugin(
   commit: string,
   upstream: typeof fetch = fetch,
 ): Plugin {
-  const config = makeConfiguration(env, version, commit);
+  const configurations = tasks.map((task) =>
+    makeConfiguration(env, version, commit, task),
+  );
+  const configurationById = new Map(
+    configurations.map((config) => [config.config_id, config]),
+  );
+  const sessionBindings = new Map<string, string>();
   function install(server: { middlewares: { use: (handler: any) => void } }) {
     server.middlewares.use(
       async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const path = req.url?.split("?")[0];
-        if (path !== "/api/config" && path !== "/api/chat") return next();
+        if (!["/api/config", "/api/chat", "/api/tasks"].includes(path ?? ""))
+          return next();
         // Avoid cross-origin use of this credentialed local API.
         if (
           req.headers.origin &&
@@ -113,10 +169,25 @@ export function pilotPlugin(
           return json(res, 403, {
             error: "Cross-origin requests are disabled",
           });
-        if (path === "/api/config")
+        if (path === "/api/tasks")
           return req.method === "GET"
-            ? json(res, 200, config)
+            ? json(res, 200, taskCatalog)
             : json(res, 405, { error: "GET only" });
+        if (path === "/api/config") {
+          if (req.method !== "GET")
+            return json(res, 405, { error: "GET only" });
+          const taskId =
+            new URL(
+              req.url ?? "/api/config",
+              "http://localhost",
+            ).searchParams.get("task_id") ?? defaultTask.task_id;
+          const selected = configurations.find(
+            (config) => config.task.task_id === taskId,
+          );
+          return selected
+            ? json(res, 200, selected)
+            : json(res, 404, { error: "Unknown task" });
+        }
         if (req.method !== "POST")
           return json(res, 405, { error: "POST only" });
         const abort = new AbortController();
@@ -149,29 +220,37 @@ export function pilotPlugin(
             typeof body.request_id !== "string"
           )
             return json(res, 400, { error: "Missing session/request ID" });
-          if (body.config_id !== config.config_id)
+          const config = configurationById.get(body.config_id);
+          if (!config)
             return json(res, 409, {
               error:
                 "Session configuration changed. End and export this session; start a new session to use the new configuration.",
             });
-          const payload = providerPayload(config, body.messages);
-          if (!env.OPENAI_API_KEY)
-            return json(res, 503, {
-              error: "Server OPENAI_API_KEY is not configured",
+          const boundConfig = sessionBindings.get(body.session_id);
+          if (boundConfig && boundConfig !== config.config_id)
+            return json(res, 409, {
+              error:
+                "This session is already bound to a different task or model configuration. Start a new session to change tasks.",
             });
+          const payload = providerPayload(config, body.messages);
+          const credentialError = apiKeyError(env, config.provider);
+          if (credentialError)
+            return json(res, 503, {
+              error: credentialError,
+            });
+          sessionBindings.set(body.session_id, config.config_id);
           phase = "upstream";
-          const response = await upstream(
-            "https://api.openai.com/v1/responses",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-              },
-              body: JSON.stringify(payload),
-              signal: abort.signal,
+          const response = await upstream(`${config.api_base_url}/responses`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${env.OPENAI_API_KEY?.trim()}`,
+              ...(config.project ? { "OpenAI-Project": config.project } : {}),
             },
-          );
+            body: JSON.stringify(payload),
+            signal: abort.signal,
+            redirect: "error",
+          });
           if (!response.ok) {
             await response.body?.cancel();
             return json(res, response.status, {
