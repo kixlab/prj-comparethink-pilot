@@ -1,0 +1,69 @@
+{
+  "task_id": "planbench-blocksworld-task1-instance2",
+  "version": "1.2.0",
+  "title": "Blocksworld planning task",
+  "language": "en",
+  "source": {
+    "repository": "https://github.com/karthikv792/LLMs-Planning",
+    "path": "plan-bench/prompts/blocksworld/task_1_plan_generation.json",
+    "commit": "9bd247838ec314f048f6a37a147201e74d64572d",
+    "url": "https://github.com/karthikv792/LLMs-Planning/blob/9bd247838ec314f048f6a37a147201e74d64572d/plan-bench/prompts/blocksworld/task_1_plan_generation.json",
+    "file_sha256": "8dd4ce10bf082b580720a91001ae77b4cdc611e79122760fa6673186b28a3e21",
+    "instance_id": 2,
+    "excluded_example_instance_ids": [1],
+    "changes": [
+      "Selected instance_id 2; removed the separate example statement and worked solution.",
+      "Omitted ground_truth_plan entirely.",
+      "Presented in English with rules and target conditions organized into labeled sections; block identities, legal actions, initial state and goal are unchanged.",
+      "Added action notation labels and explicit final submission instructions; no optimality requirement or feedback."
+    ]
+  },
+  "description": "Write a sequence of actions that moves the red, blue, yellow, and orange blocks from the initial state to the goal state. You may chat with the AI while working on the task.",
+  "actions": [
+    {
+      "name": "pick-up",
+      "label": "Pick up a block",
+      "rule": "You can pick up a block only if your hand is empty, the block is on the table, and the block is clear."
+    },
+    {
+      "name": "unstack",
+      "label": "Unstack a block",
+      "rule": "You can unstack a block only if your hand is empty, the block is directly on top of another block, and the block being removed is clear."
+    },
+    {
+      "name": "put-down",
+      "label": "Put down a block",
+      "rule": "You can put down only a block you are holding. Placing it on the table makes your hand empty."
+    },
+    {
+      "name": "stack",
+      "label": "Stack a block",
+      "rule": "You can stack a block only if you are holding it and the other block is clear. Your hand then becomes empty, and the block underneath is no longer clear."
+    }
+  ],
+  "rules": [
+    "You can pick up or unstack only one block at a time.",
+    "A block is clear if no other block is on top of it and it is not being held.",
+    "Picking up or unstacking a block makes you hold it. You can put down or stack only a block you are holding."
+  ],
+  "initial_state": [
+    "The red block is on top of the blue block.",
+    "The yellow block is on top of the orange block.",
+    "The blue block and the orange block are on the table.",
+    "The red block and the yellow block are clear.",
+    "Your hand is empty."
+  ],
+  "initial_stacks": [
+    ["blue", "red"],
+    ["orange", "yellow"]
+  ],
+  "goal_state": ["The orange block must be on top of the red block."],
+  "final_instruction": "Write and submit your final plan as an ordered sequence of actions. You may use natural language or the action names (pick-up, unstack, put-down, stack). AI responses are not submitted automatically.",
+  "original": {
+    "rules": "I am playing with a set of blocks where I need to arrange the blocks into stacks. Here are the actions I can do\n\nPick up a block\nUnstack a block from on top of another block\nPut down a block\nStack a block on top of another block\n\nI have the following restrictions on my actions:\nI can only pick up or unstack one block at a time.\nI can only pick up or unstack a block if my hand is empty.\nI can only pick up a block if the block is on the table and the block is clear. A block is clear if the block has no other blocks on top of it and if the block is not picked up.\nI can only unstack a block from on top of another block if the block I am unstacking was really on top of the other block.\nI can only unstack a block from on top of another block if the block I am unstacking is clear.\nOnce I pick up or unstack a block, I am holding the block.\nI can only put down a block that I am holding.\nI can only stack a block on top of another block if I am holding the block being stacked.\nI can only stack a block on top of another block if the block onto which I am stacking the block is clear.\nOnce I put down or stack a block, my hand becomes empty.\nOnce you stack a block on top of a second block, the second block is no longer clear.",
+    "initial_state": "the red block is clear, the yellow block is clear, the hand is empty, the red block is on top of the blue block, the yellow block is on top of the orange block, the blue block is on the table and the orange block is on the table",
+    "goal_state": "the orange block is on top of the red block"
+  },
+  "kind": "blocksworld",
+  "participant_instruction": "Read the action rules, initial state, and goal. You may chat with the AI freely while working on the action sequence. Submit your final plan yourself when you are finished."
+}
