@@ -256,6 +256,27 @@ STT_LANGUAGE=auto
 - 파형은 원본 녹음을 브라우저 안에서 디코딩해 표시하며 읽기 쉽도록 segment별 진폭을 조정합니다. 실제 발화 전사나 발화 구간 검출이 아닙니다. 파형을 디코딩할 수 없어도 원본 다운로드는 유지합니다. 녹음 gap/수집 정지 의심은 타임라인에 표시하고 연결해 숨기지 않습니다.
 - 타임라인은 1×/2×/4× 확대와 가로 스크롤을 지원합니다. 세션 시각과 개별 녹음 파일의 재생 위치를 구분하며, 요청별 세부 시각과 전체 이벤트 시각표는 필요할 때 확인할 수 있습니다. 저장된 세션의 **Review recording**에서도 같은 화면을 제공합니다.
 
+### 이벤트 기준 음성 구간 재생
+
+Session review의 각 Exchange 위에서 다음 구간을 선택해 들을 수 있습니다. STT 없이 원본 이벤트에서 계산하며 원본 음성 파일은 자르거나 재인코딩하지 않습니다.
+
+| 화면 구간           | 시간 경계                                                            |
+| ------------------- | -------------------------------------------------------------------- |
+| Before first prompt | `task_started` → 첫 `prompt_sent`. 첫 Exchange 위에서 재생           |
+| Waiting             | `prompt_sent` → `ai_first_display`                                   |
+| Response appearing  | `ai_first_display` → `ai_completed` / `ai_interrupted` / `ai_failed` |
+| After response      | AI 종료 이벤트 → 다음 `prompt_sent` 또는 최종 제출/과제 종료         |
+
+두 번째 이후 **Previous interval**은 직전의 동일한 정규 구간을 참조합니다. 예를 들어 첫 응답 뒤 구간과 두 번째 프롬프트 직전 구간은 같은 `window_id`이며, 분석용 구간을 중복 생성하지 않습니다. 프롬프트 없이 제출한 세션도 과제 시작부터 제출까지 재생할 수 있습니다.
+
+기본값은 **Include up to 2 s before and after each window**입니다. 체크를 해제하면 기준 구간만 재생합니다. **Event boundaries**는 원래 이벤트 경계, **Playback range**는 앞뒤 맥락을 더한 범위이며 과제 시작/끝을 넘지 않습니다. 타임라인 실선은 이벤트 경계, 점선은 재생 맥락의 끝입니다. 선택한 구간 끝에서 재생이 멈춥니다. 일반 메시지 재생·타임라인 이동·플레이어 직접 조작은 구간 선택을 해제하고 일반 재생으로 돌아갑니다.
+
+첫 텍스트 표시 없이 API가 실패하면 Waiting은 실패까지 이어지고 Response appearing은 만들지 않습니다. 일부 응답 뒤 실패·중단은 실제 종료 이벤트까지 보존합니다. 종료 이벤트가 없으면 다음 프롬프트/제출/과제 종료 또는 마지막 관찰 시점에서 잘라 `censored: true`로 표시하며 완료를 추정하지 않습니다. `ai_first_display`는 뷰에 텍스트를 넘긴 관찰 시각으로, 실제 화면 픽셀 표시나 모델 내부 생성 시작과 같지 않습니다.
+
+녹음 중단·mute·음성 바이트가 없는 범위는 누락으로 남습니다. 하나의 재생 범위에 여러 녹음 부분이 있으면 **Part 1 / Part 2**로 나누어 표시하고, 각 부분 끝에서 멈춥니다. 다음 부분은 사용자가 직접 선택합니다. collector 정지 의심/미종료 녹음은 `uncertain`으로 알립니다. 브라우저 타이머·장치 지연 때문에 재생 정지와 정렬은 샘플 수준 정확도가 아닙니다.
+
+`audio/review_windows.json`은 원본 이벤트로부터 다시 계산할 수 있는 파생 메타데이터입니다. 정규 구간의 ID·종류·시작/끝·duration·경계 원본 `event_id`·요청 연결·응답 상태·censored 여부, Exchange별 구간 참조, `audio`(맥락 없음)와 `default_playback`(앞뒤 최대 2초)의 원본 파일/segment/재생 초 단위 범위·누락 범위를 제공합니다. **이 구간은 연구상의 move/node나 STT 발화 단위를 확정하지 않습니다.** 이벤트와 원음은 기존 형태로 보존하며 기존 저장 세션에도 같은 계산을 적용합니다.
+
 ## 수집 이벤트
 
 | 종류          | 이벤트                                                                                                                                                                                                                                                                          |
@@ -288,6 +309,7 @@ session.json          # 익명 ID, 설정, 과제·모델·앱 버전, 안내 �
  final_answer.txt     # 명시적으로 제출한 원문. 미제출이면 빈 파일
  audio/manifest.json  # 실제 MIME, segment/chunk ID·순서·시간, 누락 구간 및 정렬 한계
  audio/timeline.json  # 요청별 주요 이벤트 → 녹음 파일·재생 위치(초), 매핑 상태 및 시점 정의
+ audio/review_windows.json # 이벤트 기준 정규 구간·참조 ID, 앞뒤 맥락 재생 범위·녹음 부분·누락
  audio/segment-001.webm (또는 mp4/ogg/bin) # 원본 청크를 순서대로 연결, 재인코딩 없음
  audio/chunks/...     # 원본 MediaRecorder Blob 각각
 ```
@@ -298,6 +320,7 @@ session.json          # 익명 ID, 설정, 과제·모델·앱 버전, 안내 �
 
 - `src/pilot/App.tsx`, `style.css`: 마이크 테스트, 안내, 과제, 채팅, 제출, 재다운로드.
 - `src/pilot/SessionReview.tsx`: 종료/저장 세션의 대화 원문, 실제 녹음 파형, 공통 타임라인, 재생 위치와 대화 연동.
+- `src/pilot/reviewWindows.ts`, `AudioWindowControls.tsx`: 이벤트에서 가상 음성 구간·원본 파일 위치를 계산하고 Exchange별 재생 버튼을 표시합니다. 기준/맥락 범위, 실패·미완료·녹음 누락 정책은 이곳에서 변경합니다.
 - `src/pilot/engine.ts`: 세션 시계, 전송/AI/음성 생명주기와 원본 이벤트.
 - `src/pilot/storage.ts`: IndexedDB 및 재시도 가능한 append 기록 큐.
 - `src/pilot/export.ts`: 이벤트 기반 메시지 재구성과 원본 ZIP.

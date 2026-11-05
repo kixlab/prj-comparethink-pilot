@@ -629,6 +629,93 @@ audio {
 .review-exchange.selected {
   border-left-color: var(--blue);
 }
+.review-window-options {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.review-window-options label {
+  font-size: 12px;
+}
+.review-window-options p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.audio-window-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.audio-window-controls button {
+  text-align: left;
+  padding: 7px 9px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.audio-window-controls span,
+.audio-window-controls small {
+  display: block;
+}
+.audio-window-controls small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.audio-window-controls button[aria-pressed="true"],
+.window-parts button[aria-pressed="true"] {
+  background: #e4edf9;
+  border-color: var(--blue);
+}
+.review-window-selection {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: #f6f8fb;
+  font-size: 12px;
+}
+.window-selection-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.window-playback-state {
+  color: var(--muted);
+}
+.review-window-selection dl {
+  margin: 10px 0;
+}
+.review-window-selection dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 5px 0;
+}
+.review-window-selection dt {
+  min-width: 105px;
+  color: var(--muted);
+}
+.review-window-selection dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.window-warning {
+  line-height: 1.5;
+  color: #7b4b17;
+}
+.window-parts,
+.window-playback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.window-parts button,
+.window-playback-actions button {
+  font-size: 12px;
+  padding: 6px 9px;
+}
 .exchange-heading {
   color: var(--muted);
   font-size: 12px;
@@ -937,6 +1024,26 @@ audio {
   background: #b5272b;
   pointer-events: none;
   z-index: 4;
+}
+.timeline-window-context,
+.timeline-window-boundary {
+  position: absolute;
+  inset-block: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.timeline-legend .legend-window {
+  background: #245ea612;
+  border: 2px solid #245ea6;
+}
+.timeline-window-context {
+  background: #245ea612;
+  border-inline: 1px dashed #245ea6;
+}
+.timeline-window-boundary {
+  background: #245ea612;
+  border-inline: 2px solid #245ea6;
+  border-block: 2px solid #245ea6;
 }
 .timeline-legend {
   display: flex;

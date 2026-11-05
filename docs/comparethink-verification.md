@@ -124,3 +124,14 @@ Blocksworld와 공식 TravelPlanner validation row 0을 시작 전 선택할 수
 - 자동 브라우저 검사의 마이크는 기존 합성 MediaStream이고 STT/채팅 외부 처리는 fixture입니다. 별도로 위의 실제 로컬 Whisper 전체 경로를 확인했으며, 유료 STT 공급자의 실제 키·권한·품질·요금 검증은 수행하지 않았습니다.
 - DB 이름은 유지하고 version 2에서 add-only `transcriptions` store만 추가했습니다. 시작/결과·실패는 새 entry ID, 재시도는 새 attempt ID이며 원본 events/audio와 완료본을 덮어쓰지 않습니다. STT 저장·읽기 실패는 원본 녹음 ZIP을 막지 않습니다.
 - 전사 사용 시 `transcriptions.json`, `transcript.txt`, 세션 기준 `transcript.vtt`가 추가됩니다. 시각을 반환하지 않는 API 응답에는 임의의 발화 경계를 만들지 않습니다. 원자료의 collection_status와 후처리 전사 상태는 별개입니다.
+
+## 이벤트 기준 가상 음성 구간 (2026-11-05)
+
+- 첫 프롬프트 전, 프롬프트 전송→첫 표시, 첫 표시→응답 종료, 응답 종료→다음 프롬프트/최종 제출 구간을 원본 이벤트에서 계산합니다. 첫 표시 없는 실패는 대기→실패로 끝내고 표시 중 구간은 생성하지 않습니다. 종료를 관찰하지 못한 경우 다음 경계/마지막 관찰에서 censored로 표시합니다.
+- 다음 Exchange의 Previous interval은 기존 구간 ID를 참조합니다. 원자료를 덮어쓰거나 같은 구간을 중복 생성하지 않습니다. 앞뒤 최대 2초 맥락과 기준 경계를 구분하고, 과제 범위로 제한합니다. 원본 음성은 물리적으로 분할하지 않으며 STT/협업 AI를 호출하지 않습니다.
+- 녹음 중단/mute/바이트 없는 범위는 unavailable로 보존합니다. 재생은 각 녹음 부분 끝에서 정지하며 다음 부분은 별도로 선택합니다. collector 정지 의심/미종료 녹음은 uncertain 표시입니다. 정렬·정지 정확도는 브라우저 시간 기반이며 샘플 수준이 아닙니다.
+- ZIP의 `audio/review_windows.json`에 원본 경계 event ID, 요청 연결, 구간별 상태·시각, 원본 녹음 파일과 재생 범위, 누락, 기본 맥락 범위를 추가했습니다. DB 버전·원본 events/audio·STT 기록 형식은 유지합니다. 구간은 연구 move/node나 전사 발화 정의가 아닙니다.
+- 단위 검사: `npm test` 27개 통과. 새 6개에서 정상 구간 분할·직전 구간 참조·맥락 제한, 표시 전/후 실패, 중단·미관찰 종료, 프롬프트 없는 제출·길이 0, gap/mute/바이트 없음/uncertain, ZIP의 경계·원본 이벤트·음성 보존을 확인했습니다.
+- Chrome에서 선택한 구간 끝 자동 정지(기준 재생 끝과 차이 150ms 미만), 맥락 선택, 정규/재생 범위 표시, 새로고침 후 동일 구간 내보내기, 실패 시 표시 구간 비활성화, 녹음 중단 후 Part 1 끝 정지 및 Part 2 명시적 선택을 확인했습니다. 데스크톱/390px 화면 이미지는 `test-results/audio-window-desktop.png`, `test-results/audio-window-mobile.png`입니다.
+- 전체 `npm run test:browser` 11개, `npm run build`, `npm run format:check`, `git diff --check`도 통과했습니다.
+- 자동 검사의 음성은 기존 합성 MediaStream을 실제 MediaRecorder로 수집한 것이며 채팅/STT 외부 응답은 fixture입니다. 이 변경에서 실제 모델/STT API 호출이나 전사 정확도 평가는 하지 않았습니다.

@@ -4,6 +4,9 @@ import { errorText } from "./types";
 import { messagesFromEvents } from "./export";
 import { audioTimeline } from "./timing";
 import TranscriptionPanel from "./TranscriptionPanel";
+import AudioWindowControls from "./AudioWindowControls";
+import { reviewWindows, windowPlayback } from "./reviewWindows";
+import type { ReviewWindow, WindowAudioPart } from "./reviewWindows";
 
 type Marker = ReturnType<typeof audioTimeline>[number];
 const time = (ms: number, decimals = 1) => {
@@ -29,6 +32,31 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
     [snapshot],
   );
   const markers = useMemo(() => audioTimeline(snapshot), [snapshot]);
+  const windowData = useMemo(() => reviewWindows(snapshot), [snapshot]);
+  const [includeContext, setIncludeContext] = useState(true);
+  const [windowSelection, setWindowSelection] = useState<{
+    window_id: string;
+    request_id: string | null;
+    part_index: number;
+  } | null>(null);
+  const [windowStatus, setWindowStatus] = useState("Stopped");
+  const windowRun = useRef<{ part: WindowAudioPart } | null>(null);
+  const windowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedWindow = windowData.windows.find(
+    (w) => w.window_id === windowSelection?.window_id,
+  );
+  const selectedPlayback = useMemo(
+    () =>
+      selectedWindow
+        ? windowPlayback(
+            snapshot,
+            selectedWindow,
+            includeContext ? 2000 : 0,
+            windowData,
+          )
+        : null,
+    [snapshot, selectedWindow?.window_id, includeContext, windowData],
+  );
   const exchanges = useMemo(
     () =>
       messages
@@ -77,8 +105,9 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
   const segment = session.audio_segments.find(
     (s) => s.segment_id === segmentId,
   );
+  const selectedRequestForView = windowSelection?.request_id ?? selectedRequest;
   const selected = exchanges.find(
-    (e) => e.human.request_id === selectedRequest,
+    (e) => e.human.request_id === selectedRequestForView,
   );
   const activeMessage = messages
     .filter(
@@ -108,7 +137,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
       (g) =>
         g.kind.startsWith("audio") &&
         playhead >= g.start_t_ms &&
-        playhead <= (g.end_t_ms ?? end),
+        playhead < (g.end_t_ms ?? end),
     );
   const position = (ms: number) =>
     `${Math.max(0, Math.min(100, (ms / end) * 100))}%`;
@@ -245,16 +274,116 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
     return () => observer.disconnect();
   }, [playhead, zoom, end]);
 
+  useEffect(
+    () => () => {
+      if (windowTimer.current) clearTimeout(windowTimer.current);
+      windowRun.current = null;
+    },
+    [],
+  );
+  const clearWindow = () => {
+    if (windowTimer.current) clearTimeout(windowTimer.current);
+    windowTimer.current = null;
+    windowRun.current = null;
+    pendingSeek.current = null;
+    setWindowSelection(null);
+  };
+  const finishWindow = () => {
+    if (windowTimer.current) clearTimeout(windowTimer.current);
+    windowTimer.current = null;
+    windowRun.current = null;
+    audioEl.current?.pause();
+    setWindowStatus("Finished");
+  };
+  const enforceWindow = () => {
+    if (windowTimer.current) clearTimeout(windowTimer.current);
+    windowTimer.current = null;
+    const run = windowRun.current,
+      player = audioEl.current;
+    if (
+      !run ||
+      !player ||
+      player.paused ||
+      player.dataset.segmentId !== run.part.segment_id
+    )
+      return;
+    const remaining = run.part.audio_end_seconds - player.currentTime;
+    if (remaining <= 0.015 || player.ended) {
+      finishWindow();
+      return;
+    }
+    windowTimer.current = setTimeout(
+      enforceWindow,
+      Math.max(10, (remaining * 1000) / Math.max(0.1, player.playbackRate)),
+    );
+  };
+  const playWindow = (
+    window: ReviewWindow,
+    requestId: string | null,
+    partIndex = 0,
+    context = includeContext,
+  ) => {
+    if (windowTimer.current) clearTimeout(windowTimer.current);
+    windowRun.current = null;
+    pendingSeek.current = null;
+    audioEl.current?.pause();
+    const playback = windowPlayback(
+      snapshot,
+      window,
+      context ? 2000 : 0,
+      windowData,
+    );
+    setWindowSelection({
+      window_id: window.window_id,
+      request_id: requestId,
+      part_index: partIndex,
+    });
+    const part = playback.parts[partIndex];
+    if (!part) {
+      setWindowStatus("No recorded audio");
+      return;
+    }
+    windowRun.current = { part };
+    setWindowStatus("Loading");
+    seekTime(part.start_t_ms, true, false, true);
+    setNotice("");
+  };
+  const rangeOverlay =
+    selectedWindow && selectedPlayback ? (
+      <>
+        <div
+          className="timeline-window-context"
+          style={spanStyle(
+            selectedPlayback.start_t_ms,
+            selectedPlayback.end_t_ms,
+          )}
+        />
+        <div
+          className="timeline-window-boundary"
+          style={spanStyle(selectedWindow.start_t_ms, selectedWindow.end_t_ms)}
+        />
+      </>
+    ) : null;
+
   const applySeek = (target: NonNullable<typeof pendingSeek.current>) => {
     const player = audioEl.current;
     if (!player) return;
     player.currentTime = target.position;
     if (target.autoplay)
       void player.play().catch((error) => {
-        if (error.name !== "AbortError") setNotice(errorText(error));
+        if (error.name !== "AbortError") {
+          setNotice(errorText(error));
+          if (windowRun.current) setWindowStatus("Playback failed");
+        }
       });
   };
-  const seekTime = (t: number, autoplay: boolean, finalSelection = false) => {
+  const seekTime = (
+    t: number,
+    autoplay: boolean,
+    finalSelection = false,
+    preserveWindow = false,
+  ) => {
+    if (!preserveWindow) clearWindow();
     setSelectedFinal(finalSelection);
     const value = Math.max(0, Math.min(end, t));
     setPlayhead(value);
@@ -262,15 +391,21 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
       .filter((e) => e.human.created_t_ms <= value)
       .at(-1);
     setSelectedRequest(exchange?.human.request_id ?? "");
-    const target = session.audio_segments.find(
-      (s) =>
-        value >= s.started_t_ms && value <= (s.ended_t_ms ?? session.last_t_ms),
-    );
+    const target =
+      preserveWindow && windowRun.current
+        ? session.audio_segments.find(
+            (s) => s.segment_id === windowRun.current!.part.segment_id,
+          )
+        : session.audio_segments.find(
+            (s) =>
+              value >= s.started_t_ms &&
+              value <= (s.ended_t_ms ?? session.last_t_ms),
+          );
     const gap = audioGaps.find(
       (g) =>
         g.kind.startsWith("audio") &&
         value >= g.start_t_ms &&
-        value <= (g.end_t_ms ?? end),
+        value < (g.end_t_ms ?? end),
     );
     const hasBytes =
       target &&
@@ -301,6 +436,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
     else pendingSeek.current = pending;
   };
   const seekMarker = (marker: Marker | undefined) => {
+    clearWindow();
     if (!marker) {
       setNotice("No timestamp was recorded for this message.");
       return;
@@ -366,13 +502,45 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
             <h3>Conversation</h3>
             <span>Human prompts and AI responses</span>
           </div>
+          <div className="review-window-options">
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={includeContext}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setIncludeContext(next);
+                  if (selectedWindow)
+                    playWindow(
+                      selectedWindow,
+                      windowSelection?.request_id ?? null,
+                      0,
+                      next,
+                    );
+                }}
+              />
+              Include up to 2 s before and after each window
+            </label>
+            <p>
+              Review intervals use event timestamps. They do not define research
+              moves or speech boundaries.
+            </p>
+            {!exchanges.length && windowData.windows[0] && (
+              <button
+                onClick={() => playWindow(windowData.windows[0], null)}
+                disabled={windowData.windows[0].duration_ms <= 0}
+              >
+                Play before-first-prompt audio
+              </button>
+            )}
+          </div>
           <div className="review-transcript" ref={transcriptEl}>
             {!exchanges.length && (
               <p className="review-empty">No chat messages were sent.</p>
             )}
             {exchanges.map((exchange) => (
               <section
-                className={`review-exchange ${selectedRequest === exchange.human.request_id ? "selected" : ""}`}
+                className={`review-exchange ${selectedRequestForView === exchange.human.request_id ? "selected" : ""}`}
                 key={exchange.human.request_id}
                 data-request-id={exchange.human.request_id}
               >
@@ -380,6 +548,18 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                   <h4>Exchange {exchange.number}</h4>
                   <span>{time(exchange.human.created_t_ms)}</span>
                 </div>
+                {windowData.exchanges.find(
+                  (e) => e.request_id === exchange.human.request_id,
+                ) && (
+                  <AudioWindowControls
+                    exchange={windowData.exchanges.find(
+                      (e) => e.request_id === exchange.human.request_id,
+                    )!}
+                    windows={windowData.windows}
+                    selectedId={windowSelection?.window_id ?? null}
+                    onSelect={playWindow}
+                  />
+                )}
                 {[exchange.human, exchange.ai]
                   .filter((m): m is Message => Boolean(m))
                   .map((message) => {
@@ -493,11 +673,33 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 key={source.segmentId}
                 ref={audioEl}
                 src={source.url}
+                data-segment-id={source.segmentId}
                 controls
                 preload="metadata"
                 aria-label="Session recording playback"
-                onPointerDown={() => setSelectedFinal(false)}
-                onKeyDown={() => setSelectedFinal(false)}
+                onPointerDown={() => {
+                  setSelectedFinal(false);
+                  clearWindow();
+                }}
+                onKeyDown={() => {
+                  setSelectedFinal(false);
+                  clearWindow();
+                }}
+                onPlay={() => {
+                  if (windowRun.current) {
+                    setWindowStatus("Playing");
+                    enforceWindow();
+                  }
+                }}
+                onPause={() => {
+                  if (windowTimer.current) clearTimeout(windowTimer.current);
+                  if (windowRun.current) setWindowStatus("Paused");
+                }}
+                onEnded={() => {
+                  if (windowRun.current) finishWindow();
+                }}
+                onRateChange={enforceWindow}
+                onSeeked={enforceWindow}
                 onLoadedMetadata={() => {
                   const pending = pendingSeek.current;
                   if (pending?.segmentId === source.segmentId) {
@@ -507,6 +709,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 }}
                 onTimeUpdate={(event) => {
                   if (source.segmentId !== segmentId) return;
+                  enforceWindow();
                   const recorded = session.audio_segments.find(
                     (s) => s.segment_id === source.segmentId,
                   );
@@ -522,11 +725,16 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                     .at(-1);
                   setSelectedRequest(exchange?.human.request_id ?? "");
                 }}
-                onError={() =>
+                onError={() => {
+                  if (windowRun.current) {
+                    if (windowTimer.current) clearTimeout(windowTimer.current);
+                    windowRun.current = null;
+                    setWindowStatus("Playback failed");
+                  }
                   setNotice(
                     "This recording could not be played by the browser. The original audio remains in the session ZIP.",
-                  )
-                }
+                  );
+                }}
               />
             ) : (
               <p className="review-empty">
@@ -550,6 +758,106 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
               />
             </label>
           </div>
+          {selectedWindow && selectedPlayback && (
+            <section
+              className="review-window-selection"
+              aria-label="Selected audio window"
+              data-window-id={selectedWindow.window_id}
+            >
+              <div className="window-selection-heading">
+                <strong>{selectedWindow.label}</strong>
+                <span className="window-playback-state">{windowStatus}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Event boundaries</dt>
+                  <dd>
+                    {time(selectedWindow.start_t_ms, 3)} →{" "}
+                    {time(selectedWindow.end_t_ms, 3)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Playback range</dt>
+                  <dd>
+                    {time(selectedPlayback.start_t_ms, 3)} →{" "}
+                    {time(selectedPlayback.end_t_ms, 3)}
+                  </dd>
+                </div>
+              </dl>
+              {selectedWindow.censored && (
+                <p className="window-warning">
+                  An ending was not observed. This interval stops at the next
+                  recorded boundary.
+                </p>
+              )}
+              {selectedPlayback.unavailable.length > 0 && (
+                <p className="window-warning">
+                  This range contains unrecorded or muted time. Each recorded
+                  part stops separately; gaps are not joined.
+                </p>
+              )}
+              {!selectedPlayback.parts.length && (
+                <p className="window-warning">
+                  No recorded audio is available in this range.
+                </p>
+              )}
+              {selectedPlayback.parts.some(
+                (part) => part.mapping_status === "uncertain",
+              ) && (
+                <p className="window-warning">
+                  Recording continuity or its ending is uncertain. Times are
+                  approximate.
+                </p>
+              )}
+              {selectedPlayback.parts.length > 1 && (
+                <div className="window-parts">
+                  {selectedPlayback.parts.map((part, index) => (
+                    <button
+                      key={`${part.segment_id}-${part.start_t_ms}`}
+                      aria-label={`Play recorded part ${index + 1}`}
+                      onClick={() =>
+                        playWindow(
+                          selectedWindow,
+                          windowSelection?.request_id ?? null,
+                          index,
+                        )
+                      }
+                      aria-pressed={windowSelection?.part_index === index}
+                    >
+                      Part {index + 1} · {time(part.start_t_ms)}–
+                      {time(part.end_t_ms)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="window-playback-actions">
+                <button
+                  onClick={() =>
+                    playWindow(
+                      selectedWindow,
+                      windowSelection?.request_id ?? null,
+                      windowSelection?.part_index ?? 0,
+                    )
+                  }
+                  disabled={!selectedPlayback.parts.length}
+                >
+                  Replay window
+                </button>
+                <button
+                  onClick={() => {
+                    if (windowTimer.current) clearTimeout(windowTimer.current);
+                    windowRun.current = null;
+                    pendingSeek.current = null;
+                    audioEl.current?.pause();
+                    setWindowStatus("Stopped");
+                  }}
+                  disabled={!windowRun.current}
+                >
+                  Stop window playback
+                </button>
+              </div>
+            </section>
+          )}
           <div className="timeline-toolbar">
             <span>All times from session start</span>
             <label>
@@ -638,6 +946,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                       </span>
                     </div>
                   ))}
+                  {rangeOverlay}
                   <i
                     className="timeline-playhead"
                     style={{ left: position(playhead) }}
@@ -655,7 +964,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                     )
                     .map((marker) => (
                       <button
-                        className={`timeline-marker ${marker.request_id === selectedRequest ? "selected" : ""} ${marker.type === "final_submitted" ? "final" : ""}`}
+                        className={`timeline-marker ${marker.request_id === selectedRequestForView ? "selected" : ""} ${marker.type === "final_submitted" ? "final" : ""}`}
                         key={marker.event_id}
                         style={{ left: position(marker.t_ms) }}
                         aria-label={
@@ -671,6 +980,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                           : marker.turn_index}
                       </button>
                     ))}
+                  {rangeOverlay}
                   <i
                     className="timeline-playhead"
                     style={{ left: position(playhead) }}
@@ -683,25 +993,21 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                   {exchanges.map((exchange) => {
                     const ai = exchange.ai;
                     if (!ai) return null;
-                    const start = ai.request_dispatched_t_ms ?? ai.created_t_ms;
-                    const first =
-                      ai.first_received_t_ms ?? ai.first_display_t_ms;
+                    const start = exchange.human.created_t_ms;
+                    const first = ai.first_display_t_ms;
                     const stop = ai.ended_t_ms ?? session.last_t_ms;
                     return (
                       <div key={ai.message_id}>
                         <button
-                          className={`timeline-phase waiting-phase ${selectedRequest === ai.request_id ? "selected" : ""}`}
+                          className={`timeline-phase waiting-phase ${selectedRequestForView === ai.request_id ? "selected" : ""}`}
                           style={spanStyle(start, first ?? stop)}
                           aria-label={`Jump to AI waiting ${exchange.number}`}
                           title={`Exchange ${exchange.number} · Waiting ${time(start)}–${time(first ?? stop)}`}
                           onClick={() =>
                             seekMarker(
                               exchange.markers.find(
-                                (m) => m.type === "ai_request_dispatched",
-                              ) ??
-                                exchange.markers.find(
-                                  (m) => m.type === "ai_request_started",
-                                ),
+                                (m) => m.type === "prompt_sent",
+                              ),
                             )
                           }
                         >
@@ -709,7 +1015,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                         </button>
                         {first !== undefined && (
                           <button
-                            className={`timeline-phase response-phase ${ai.status} ${selectedRequest === ai.request_id ? "selected" : ""}`}
+                            className={`timeline-phase response-phase ${ai.status} ${selectedRequestForView === ai.request_id ? "selected" : ""}`}
                             style={spanStyle(first, stop)}
                             aria-label={`Jump to AI response ${exchange.number}`}
                             title={`Exchange ${exchange.number} · Response ${time(first)}–${time(stop)} · ${terminalLabels[ai.status]}`}
@@ -721,6 +1027,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                       </div>
                     );
                   })}
+                  {rangeOverlay}
                   <i
                     className="timeline-playhead"
                     style={{ left: position(playhead) }}
@@ -742,6 +1049,12 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
               <i className="legend-response" />
               AI response
             </span>
+            {selectedWindow && (
+              <span>
+                <i className="legend-window" />
+                Window boundary · dashed edges: playback context
+              </span>
+            )}
             {audioGaps.length > 0 && (
               <span>
                 <i className="legend-gap" />

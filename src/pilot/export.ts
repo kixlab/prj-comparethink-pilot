@@ -2,6 +2,7 @@ import { zip, strToU8 } from "fflate";
 import type { Message, Snapshot } from "./types";
 import { audioTimeline, boundaryDefinitions, segmentAudioFile } from "./timing";
 import { displayTranscriptions } from "./transcriptionTypes";
+import { reviewWindowManifest } from "./reviewWindows";
 export function messagesFromEvents(events: Snapshot["events"]): Message[] {
   const messages = new Map<string, Message>();
   for (const event of events) {
@@ -160,6 +161,7 @@ export async function buildArchive(
   files["audio/manifest.json"] = json({
     segments: manifest,
     timeline_file: "audio/timeline.json",
+    review_windows_file: "audio/review_windows.json",
     time_unit: "ms",
     seek: "For an event inside a recorded segment: audio_position_seconds = (event.t_ms - segment.started_t_ms) / 1000. Never seek across a recorded gap.",
     timing_limits:
@@ -167,6 +169,7 @@ export async function buildArchive(
     expected_timeslice_ms: 1000,
     gaps: session.gaps,
   });
+  files["audio/review_windows.json"] = json(reviewWindowManifest(snapshot));
   files["audio/timeline.json"] = json({
     schema_version: "comparethink-audio-timeline-v1",
     session_id: session.session_id,

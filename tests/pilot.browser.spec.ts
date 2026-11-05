@@ -283,6 +283,7 @@ test("completed review connects multiple exchanges, waveform playback and timeli
 }) => {
   await start(page);
   const input = page.getByRole("textbox", { name: "Message to AI" });
+  await page.waitForTimeout(800);
   for (const prompt of [
     "First planning question",
     "Follow-up planning question",
@@ -292,6 +293,7 @@ test("completed review connects multiple exchanges, waveform playback and timeli
     await expect(
       page.getByRole("button", { name: "Send", exact: true }),
     ).toBeVisible();
+    await page.waitForTimeout(900);
   }
   await submit(page, "My final plan for review");
   const review = page.getByRole("region", {
@@ -302,6 +304,85 @@ test("completed review connects multiple exchanges, waveform playback and timeli
   await expect(review.locator(".review-message.human")).toHaveCount(2);
   await expect(review.locator(".review-message.assistant")).toHaveCount(2);
   await expect(review.locator(".recording-waveform path")).toHaveCount(1);
+  const files = await download(page);
+  const windows = parsed(files, "audio/review_windows.json");
+  expect(windows.windows).toHaveLength(7);
+  expect(windows.exchanges[1].before_window_id).toBe(
+    windows.exchanges[0].after_window_id,
+  );
+  const afterFirst = review.getByRole("button", {
+    name: "Play after-response audio, exchange 1",
+    exact: true,
+  });
+  const previousSecond = review.getByRole("button", {
+    name: "Play previous audio, exchange 2",
+    exact: true,
+  });
+  expect(await previousSecond.getAttribute("data-window-id")).toBe(
+    await afterFirst.getAttribute("data-window-id"),
+  );
+  const context = review.getByRole("checkbox", {
+    name: "Include up to 2 s before and after each window",
+  });
+  await expect(context).toBeChecked();
+  await context.uncheck();
+  await review
+    .getByRole("button", {
+      name: "Play waiting audio, exchange 1",
+      exact: true,
+    })
+    .click();
+  const selection = review.getByRole("region", {
+    name: "Selected audio window",
+  });
+  await expect(selection.locator(".window-playback-state")).toHaveText(
+    "Finished",
+  );
+  const wait = windows.windows.find(
+    (w: any) => w.window_id === windows.exchanges[0].waiting_window_id,
+  );
+  const current = await review
+    .locator("audio")
+    .evaluate((a: HTMLAudioElement) => ({
+      paused: a.paused,
+      time: a.currentTime,
+    }));
+  expect(current.paused).toBe(true);
+  expect(
+    Math.abs(current.time - wait.audio.parts[0].audio_end_seconds),
+  ).toBeLessThan(0.15);
+  await expect(review.locator(".timeline-window-boundary")).toHaveCount(3);
+  // Padded playback is visibly distinct from event boundaries, without changing canonical exports.
+  await context.check();
+  await expect(selection.locator(".window-playback-state")).toHaveText(
+    "Playing",
+  );
+  expect(
+    await review
+      .locator("audio")
+      .evaluate((a: HTMLAudioElement) => a.currentTime),
+  ).toBeLessThan(wait.audio.parts[0].audio_start_seconds);
+  await selection
+    .getByRole("button", { name: "Stop window playback", exact: true })
+    .click();
+  await expect(selection.locator(".window-playback-state")).toHaveText(
+    "Stopped",
+  );
+  await page.screenshot({
+    path: "test-results/audio-window-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/audio-window-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await review
     .getByRole("button", { name: "Jump to AI response 2", exact: true })
     .click();
@@ -418,6 +499,12 @@ test("completed review connects multiple exchanges, waveform playback and timeli
   await expect(page.locator(".review-final")).toContainText(
     "My final plan for review",
   );
+  expect(
+    parsed(
+      await download(page, "Download ZIP again"),
+      "audio/review_windows.json",
+    ),
+  ).toEqual(windows);
 });
 
 test("post-task transcripts seek the source recording, survive retries, cancellation, storage failure and reload without entering chat", async ({
@@ -585,6 +672,7 @@ test("HTTP failure, partial stream failure and microphone interruption retain da
   await expect(
     page.getByText("Failed · received text retained", { exact: true }),
   ).toHaveCount(2);
+  await page.waitForTimeout(900);
   // Simulate a physical microphone ending through the real track's ended event.
   await page.evaluate(() => {
     for (const track of (window as any).__testMicStream.getAudioTracks()) {
@@ -595,6 +683,7 @@ test("HTTP failure, partial stream failure and microphone interruption retain da
   await expect(
     page.getByText("Recording stopped", { exact: true }),
   ).toBeVisible();
+  await page.waitForTimeout(800);
   await page.getByRole("button", { name: "Reconnect microphone" }).click();
   await expect(page.getByText("Recording", { exact: true })).toBeVisible();
   await page.waitForTimeout(1100);
@@ -606,6 +695,58 @@ test("HTTP failure, partial stream failure and microphone interruption retain da
   expect(events).toContain("collection_gap_started");
   expect(events).toContain("ai_failed");
   expect(parsed(files, "audio/manifest.json").segments).toHaveLength(2);
+  const windowData = parsed(files, "audio/review_windows.json");
+  expect(windowData.exchanges[0].response_window_id).toBeNull();
+  await expect(
+    page.getByRole("button", {
+      name: "Play response audio, exchange 1",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page
+    .getByRole("checkbox", {
+      name: "Include up to 2 s before and after each window",
+    })
+    .uncheck();
+  await page
+    .getByRole("button", {
+      name: "Play after-response audio, exchange 2",
+      exact: true,
+    })
+    .click();
+  const selection = page.getByRole("region", { name: "Selected audio window" });
+  await expect(selection).toContainText("gaps are not joined");
+  await expect(
+    selection.getByRole("button", { name: /^Play recorded part/ }),
+  ).toHaveCount(2);
+  const after = windowData.windows.find(
+    (w: any) => w.window_id === windowData.exchanges[1].after_window_id,
+  );
+  expect(after.audio.parts).toHaveLength(2);
+  expect(after.audio.unavailable.length).toBeGreaterThan(0);
+  await expect(selection.locator(".window-playback-state")).toHaveText(
+    "Finished",
+  );
+  await expect(
+    page.getByRole("combobox", { name: "Recording segment" }),
+  ).toHaveValue(after.audio.parts[0].segment_id);
+  expect(
+    await page
+      .locator(".review audio")
+      .evaluate((a: HTMLAudioElement) => a.paused),
+  ).toBe(true);
+  await selection
+    .getByRole("button", { name: "Play recorded part 2", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Recording segment" }),
+  ).toHaveValue(after.audio.parts[1].segment_id);
+  await expect(selection.locator(".window-playback-state")).toHaveText(
+    "Playing",
+  );
+  await selection
+    .getByRole("button", { name: "Stop window playback", exact: true })
+    .click();
   const timeline = parsed(files, "audio/timeline.json");
   const finalMarker = timeline.markers.find(
     (m: any) => m.type === "final_submitted",
