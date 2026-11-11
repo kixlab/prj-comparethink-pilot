@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import type { ReviewWindow, WindowExchange } from "./reviewWindows";
 
 const duration = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
@@ -12,6 +13,7 @@ export default function AudioWindowControls({
   selectedId: string | null;
   onSelect: (window: ReviewWindow, requestId: string) => void;
 }) {
+  const { t } = useI18n();
   const choices = [
     {
       label: "Previous interval",
@@ -34,37 +36,41 @@ export default function AudioWindowControls({
     <div
       className="audio-window-controls"
       role="group"
-      aria-label={`Audio windows for exchange ${exchange.turn_index}`}
+      aria-label={t("Audio windows for exchange {number}", {
+        number: exchange.turn_index,
+      })}
     >
       {choices.map((choice) => {
         const window = windows.find((w) => w.window_id === choice.key);
         return (
           <button
             key={choice.aria}
-            aria-label={`Play ${choice.aria} audio, exchange ${exchange.turn_index}`}
+            aria-label={t(`Play ${choice.aria} audio, exchange {number}`, {
+              number: exchange.turn_index,
+            })}
             data-window-id={window?.window_id}
             aria-pressed={Boolean(window && selectedId === window.window_id)}
             disabled={!window || window.duration_ms <= 0}
             title={
               window
-                ? `${window.label}${window.censored ? " · Ending was not observed" : ""}`
+                ? `${t(window.label)}${window.censored ? ` · ${t("Ending was not observed")}` : ""}`
                 : choice.aria === "response"
-                  ? "No first-display interval was recorded"
-                  : "No bounded interval is available"
+                  ? t("No first-display interval was recorded")
+                  : t("No bounded interval is available")
             }
             onClick={() => window && onSelect(window, exchange.request_id)}
           >
             <span>
               {choice.aria === "previous" &&
               window?.kind === "before_first_prompt"
-                ? "Before first prompt"
-                : choice.label}
+                ? t("Before first prompt")
+                : t(choice.label)}
             </span>
             <small>
               {window
                 ? duration(window.duration_ms) +
-                  (window.censored ? " · unfinished" : "")
-                : "Not recorded"}
+                  (window.censored ? t(" · unfinished") : "")
+                : t("Not recorded")}
             </small>
           </button>
         );

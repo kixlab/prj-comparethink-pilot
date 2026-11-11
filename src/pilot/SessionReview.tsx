@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Snapshot } from "./types";
 import { errorText } from "./types";
@@ -26,6 +27,7 @@ const terminalLabels: Record<Message["status"], string> = {
 };
 
 export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useI18n();
   const { session, audio } = snapshot;
   const messages = useMemo(
     () => messagesFromEvents(snapshot.events),
@@ -448,13 +450,22 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
       setPlayhead(marker.t_ms);
       setSelectedFinal(marker.type === "final_submitted");
       setNotice(
-        `No recording position is available for this event (${marker.mapping_status}).`,
+        t("No recording position is available for this event ({status}).", {
+          status: marker.mapping_status,
+        }),
       );
       return;
     }
     seekTime(marker.t_ms, true, marker.type === "final_submitted");
     setNotice(
-      `${marker.label}: session ${time(marker.t_ms, 3)} → recording ${marker.audio_position_seconds.toFixed(3)} s.${marker.mapping_status === "uncertain" ? " Capture continuity is uncertain." : ""}`,
+      t("{label}: session {session} → recording {position} s.", {
+        label: t(marker.label),
+        session: time(marker.t_ms, 3),
+        position: marker.audio_position_seconds.toFixed(3),
+      }) +
+        (marker.mapping_status === "uncertain"
+          ? t(" Capture continuity is uncertain.")
+          : ""),
     );
   };
   const aiStart = (requestId: string) =>
@@ -481,26 +492,32 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
     ) ?? [];
 
   return (
-    <section className="review" aria-label="Session review">
+    <section className="review" aria-label={t("Session review")}>
       <div className="review-heading">
         <div>
-          <h2>Session review</h2>
+          <h2>{t("Session review")}</h2>
           <p>
-            {session.config.task.title} · Participant {session.participant_id}
+            {t(session.config.task.title)}
+            {t(" · Participant ")}
+            {session.participant_id}
           </p>
         </div>
         <div className="review-summary">
           <span>
-            Exchanges: {exchanges.length} · {time(end, 0)}
+            {t("Exchanges: ")}
+            {exchanges.length} · {time(end, 0)}
           </span>
           <small>{session.config.model}</small>
         </div>
       </div>
       <div className="review-grid">
-        <section className="review-conversation" aria-label="Conversation log">
+        <section
+          className="review-conversation"
+          aria-label={t("Conversation log")}
+        >
           <div className="review-panel-heading">
-            <h3>Conversation</h3>
-            <span>Human prompts and AI responses</span>
+            <h3>{t("Conversation")}</h3>
+            <span>{t("Human prompts and AI responses")}</span>
           </div>
           <div className="review-window-options">
             <label className="checkbox">
@@ -519,24 +536,25 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                     );
                 }}
               />
-              Include up to 2 s before and after each window
+              {t("Include up to 2 s before and after each window")}
             </label>
             <p>
-              Review intervals use event timestamps. They do not define research
-              moves or speech boundaries.
+              {t(
+                "Review intervals use event timestamps. They do not define research moves or speech boundaries.",
+              )}
             </p>
             {!exchanges.length && windowData.windows[0] && (
               <button
                 onClick={() => playWindow(windowData.windows[0], null)}
                 disabled={windowData.windows[0].duration_ms <= 0}
               >
-                Play before-first-prompt audio
+                {t("Play before-first-prompt audio")}
               </button>
             )}
           </div>
           <div className="review-transcript" ref={transcriptEl}>
             {!exchanges.length && (
-              <p className="review-empty">No chat messages were sent.</p>
+              <p className="review-empty">{t("No chat messages were sent.")}</p>
             )}
             {exchanges.map((exchange) => (
               <section
@@ -545,7 +563,10 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 data-request-id={exchange.human.request_id}
               >
                 <div className="exchange-heading">
-                  <h4>Exchange {exchange.number}</h4>
+                  <h4>
+                    {t("Exchange ")}
+                    {exchange.number}
+                  </h4>
                   <span>{time(exchange.human.created_t_ms)}</span>
                 </div>
                 {windowData.exchanges.find(
@@ -575,29 +596,39 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                         data-review-entry={message.message_id}
                       >
                         <div className="review-message-heading">
-                          <strong>{human ? "Human" : "AI"}</strong>
+                          <strong>{human ? t("Human") : "AI"}</strong>
                           <span className={`review-status ${message.status}`}>
-                            {terminalLabels[message.status]}
+                            {t(terminalLabels[message.status])}
                           </span>
                           <button
                             className="text-button"
-                            aria-label={`Play ${human ? "Human message" : "AI response"} ${exchange.number}`}
+                            aria-label={t(
+                              human
+                                ? "Play Human message {number}"
+                                : "Play AI response {number}",
+                              { number: exchange.number },
+                            )}
                             onClick={() => seekMarker(marker)}
                           >
                             ▶ {time(marker?.t_ms ?? message.created_t_ms)}
                           </button>
                         </div>
                         <div className="review-message-text">
-                          {message.content || "No response text was received."}
+                          {message.content ||
+                            t("No response text was received.")}
                         </div>
                         {!human && (
                           <div className="review-message-footnote">
                             {message.first_display_t_ms !== undefined
-                              ? `First response ${time(message.first_display_t_ms)}`
-                              : "No first response recorded"}
+                              ? t("First response {time}", {
+                                  time: time(message.first_display_t_ms),
+                                })
+                              : t("No first response recorded")}
                             {message.ended_t_ms !== undefined
-                              ? ` · End ${time(message.ended_t_ms)}`
-                              : " · End time unknown"}
+                              ? t(" · End {time}", {
+                                  time: time(message.ended_t_ms),
+                                })
+                              : t(" · End time unknown")}
                           </div>
                         )}
                       </article>
@@ -610,11 +641,11 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
               data-review-entry="final-submission"
             >
               <div className="review-message-heading">
-                <h3>Final submission</h3>
+                <h3>{t("Final submission")}</h3>
                 {finalMarker && (
                   <button
                     className="text-button"
-                    aria-label="Play final submission"
+                    aria-label={t("Play final submission")}
                     onClick={() => seekMarker(finalMarker)}
                   >
                     ▶ {time(finalMarker.t_ms)}
@@ -622,7 +653,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 )}
               </div>
               <div className="review-message-text">
-                {session.final_answer ?? "No final plan was submitted."}
+                {session.final_answer ?? t("No final plan was submitted.")}
               </div>
             </section>
           </div>
@@ -630,24 +661,27 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
 
         <section
           className="review-recording"
-          aria-label="Recording and timeline"
+          aria-label={t("Recording and timeline")}
         >
           <div className="review-panel-heading">
-            <h3>Microphone timeline</h3>
-            <span>Continuous think-aloud recording</span>
+            <h3>{t("Microphone timeline")}</h3>
+            <span>{t("Continuous think-aloud recording")}</span>
           </div>
           <div className="review-player">
             <div className="review-clock">
-              <strong>Session {time(playhead)}</strong>
+              <strong>
+                {t("Session ")}
+                {time(playhead)}
+              </strong>
               <span>
                 {hasPlaybackPosition && segment
-                  ? `Recording ${session.audio_segments.indexOf(segment) + 1} · ${time(Math.max(0, playhead - segment.started_t_ms))}`
-                  : "No recording at this time"}
+                  ? `${t("Recording ")}${session.audio_segments.indexOf(segment) + 1} · ${time(Math.max(0, playhead - segment.started_t_ms))}`
+                  : t("No recording at this time")}
               </span>
             </div>
             {session.audio_segments.length > 1 && (
               <label className="segment-select">
-                Recording segment
+                {t("Recording segment")}
                 <select
                   value={segmentId}
                   onChange={(event) => {
@@ -662,7 +696,8 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 >
                   {session.audio_segments.map((s, index) => (
                     <option value={s.segment_id} key={s.segment_id}>
-                      Recording {index + 1} · {time(s.started_t_ms)}
+                      {t("Recording ")}
+                      {index + 1} · {time(s.started_t_ms)}
                     </option>
                   ))}
                 </select>
@@ -676,7 +711,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 data-segment-id={source.segmentId}
                 controls
                 preload="metadata"
-                aria-label="Session recording playback"
+                aria-label={t("Session recording playback")}
                 onPointerDown={() => {
                   setSelectedFinal(false);
                   clearWindow();
@@ -687,13 +722,13 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 }}
                 onPlay={() => {
                   if (windowRun.current) {
-                    setWindowStatus("Playing");
+                    setWindowStatus(t("Playing"));
                     enforceWindow();
                   }
                 }}
                 onPause={() => {
                   if (windowTimer.current) clearTimeout(windowTimer.current);
-                  if (windowRun.current) setWindowStatus("Paused");
+                  if (windowRun.current) setWindowStatus(t("Paused"));
                 }}
                 onEnded={() => {
                   if (windowRun.current) finishWindow();
@@ -729,27 +764,29 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                   if (windowRun.current) {
                     if (windowTimer.current) clearTimeout(windowTimer.current);
                     windowRun.current = null;
-                    setWindowStatus("Playback failed");
+                    setWindowStatus(t("Playback failed"));
                   }
                   setNotice(
-                    "This recording could not be played by the browser. The original audio remains in the session ZIP.",
+                    t(
+                      "This recording could not be played by the browser. The original audio remains in the session ZIP.",
+                    ),
                   );
                 }}
               />
             ) : (
               <p className="review-empty">
-                No audio bytes are available for this recording.
+                {t("No audio bytes are available for this recording.")}
               </p>
             )}
             <label className="review-seek-label">
-              Session position
+              {t("Session position")}
               <input
                 type="range"
                 min={0}
                 max={end}
                 step={10}
                 value={playhead}
-                aria-label="Seek session recording"
+                aria-label={t("Seek session recording")}
                 aria-valuetext={time(playhead)}
                 onChange={(event) => {
                   setNotice("");
@@ -761,23 +798,23 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
           {selectedWindow && selectedPlayback && (
             <section
               className="review-window-selection"
-              aria-label="Selected audio window"
+              aria-label={t("Selected audio window")}
               data-window-id={selectedWindow.window_id}
             >
               <div className="window-selection-heading">
-                <strong>{selectedWindow.label}</strong>
-                <span className="window-playback-state">{windowStatus}</span>
+                <strong>{t(selectedWindow.label)}</strong>
+                <span className="window-playback-state">{t(windowStatus)}</span>
               </div>
               <dl>
                 <div>
-                  <dt>Event boundaries</dt>
+                  <dt>{t("Event boundaries")}</dt>
                   <dd>
                     {time(selectedWindow.start_t_ms, 3)} →{" "}
                     {time(selectedWindow.end_t_ms, 3)}
                   </dd>
                 </div>
                 <div>
-                  <dt>Playback range</dt>
+                  <dt>{t("Playback range")}</dt>
                   <dd>
                     {time(selectedPlayback.start_t_ms, 3)} →{" "}
                     {time(selectedPlayback.end_t_ms, 3)}
@@ -786,27 +823,30 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
               </dl>
               {selectedWindow.censored && (
                 <p className="window-warning">
-                  An ending was not observed. This interval stops at the next
-                  recorded boundary.
+                  {t(
+                    "An ending was not observed. This interval stops at the next recorded boundary.",
+                  )}
                 </p>
               )}
               {selectedPlayback.unavailable.length > 0 && (
                 <p className="window-warning">
-                  This range contains unrecorded or muted time. Each recorded
-                  part stops separately; gaps are not joined.
+                  {t(
+                    "This range contains unrecorded or muted time. Each recorded part stops separately; gaps are not joined.",
+                  )}
                 </p>
               )}
               {!selectedPlayback.parts.length && (
                 <p className="window-warning">
-                  No recorded audio is available in this range.
+                  {t("No recorded audio is available in this range.")}
                 </p>
               )}
               {selectedPlayback.parts.some(
                 (part) => part.mapping_status === "uncertain",
               ) && (
                 <p className="window-warning">
-                  Recording continuity or its ending is uncertain. Times are
-                  approximate.
+                  {t(
+                    "Recording continuity or its ending is uncertain. Times are approximate.",
+                  )}
                 </p>
               )}
               {selectedPlayback.parts.length > 1 && (
@@ -814,7 +854,9 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                   {selectedPlayback.parts.map((part, index) => (
                     <button
                       key={`${part.segment_id}-${part.start_t_ms}`}
-                      aria-label={`Play recorded part ${index + 1}`}
+                      aria-label={t("Play recorded part {number}", {
+                        number: index + 1,
+                      })}
                       onClick={() =>
                         playWindow(
                           selectedWindow,
@@ -824,7 +866,8 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                       }
                       aria-pressed={windowSelection?.part_index === index}
                     >
-                      Part {index + 1} · {time(part.start_t_ms)}–
+                      {t("Part ")}
+                      {index + 1} · {time(part.start_t_ms)}–
                       {time(part.end_t_ms)}
                     </button>
                   ))}
@@ -841,7 +884,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                   }
                   disabled={!selectedPlayback.parts.length}
                 >
-                  Replay window
+                  {t("Replay window")}
                 </button>
                 <button
                   onClick={() => {
@@ -849,21 +892,21 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                     windowRun.current = null;
                     pendingSeek.current = null;
                     audioEl.current?.pause();
-                    setWindowStatus("Stopped");
+                    setWindowStatus(t("Stopped"));
                   }}
                   disabled={!windowRun.current}
                 >
-                  Stop window playback
+                  {t("Stop window playback")}
                 </button>
               </div>
             </section>
           )}
           <div className="timeline-toolbar">
-            <span>All times from session start</span>
+            <span>{t("All times from session start")}</span>
             <label>
-              Zoom{" "}
+              {t("Zoom")}{" "}
               <select
-                aria-label="Timeline zoom"
+                aria-label={t("Timeline zoom")}
                 value={zoom}
                 onChange={(event) => setZoom(Number(event.target.value))}
               >
@@ -889,7 +932,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 </div>
               </div>
               <div className="timeline-lane">
-                <strong>Mic</strong>
+                <strong>{t("Mic")}</strong>
                 <div
                   className="timeline-track microphone-track"
                   ref={timelineTrack}
@@ -909,14 +952,16 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                         recorded.started_t_ms,
                         recorded.ended_t_ms ?? session.last_t_ms,
                       )}
-                      title={`Recording ${index + 1}: ${time(recorded.started_t_ms)}–${time(recorded.ended_t_ms ?? session.last_t_ms)}`}
+                      title={`${t("Recording ")}${index + 1}: ${time(recorded.started_t_ms)}–${time(recorded.ended_t_ms ?? session.last_t_ms)}`}
                     >
                       {waveforms[recorded.segment_id] ? (
                         <svg
                           className="recording-waveform"
                           viewBox="0 0 480 32"
                           preserveAspectRatio="none"
-                          aria-label={`Waveform for recording ${index + 1}`}
+                          aria-label={t("Waveform for recording {number}", {
+                            number: index + 1,
+                          })}
                         >
                           <path
                             d={waveforms[recorded.segment_id]!.map(
@@ -928,8 +973,8 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                       ) : (
                         <span>
                           {waveforms[recorded.segment_id] === null
-                            ? "Waveform unavailable"
-                            : "Loading waveform…"}
+                            ? t("Waveform unavailable")
+                            : t("Loading waveform…")}
                         </span>
                       )}
                     </div>
@@ -942,7 +987,9 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                       title={`${gap.reason}: ${time(gap.start_t_ms)}–${time(gap.end_t_ms ?? end)}`}
                     >
                       <span>
-                        {gap.kind.startsWith("audio") ? "Gap" : "Uncertain"}
+                        {gap.kind.startsWith("audio")
+                          ? t("Gap")
+                          : t("Uncertain")}
                       </span>
                     </div>
                   ))}
@@ -954,7 +1001,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 </div>
               </div>
               <div className="timeline-lane">
-                <strong>Human</strong>
+                <strong>{t("Human")}</strong>
                 <div className="timeline-track human-track">
                   {markers
                     .filter(
@@ -969,10 +1016,12 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                         style={{ left: position(marker.t_ms) }}
                         aria-label={
                           marker.type === "prompt_sent"
-                            ? `Jump to human message ${marker.turn_index}`
-                            : "Jump to final answer"
+                            ? t("Jump to human message {number}", {
+                                number: marker.turn_index ?? "",
+                              })
+                            : t("Jump to final answer")
                         }
-                        title={`${marker.label} · ${time(marker.t_ms, 3)}`}
+                        title={`${t(marker.label)} · ${time(marker.t_ms, 3)}`}
                         onClick={() => seekMarker(marker)}
                       >
                         {marker.type === "final_submitted"
@@ -988,7 +1037,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                 </div>
               </div>
               <div className="timeline-lane">
-                <strong>AI</strong>
+                <strong>{t("AI")}</strong>
                 <div className="timeline-track ai-track">
                   {exchanges.map((exchange) => {
                     const ai = exchange.ai;
@@ -1001,8 +1050,10 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                         <button
                           className={`timeline-phase waiting-phase ${selectedRequestForView === ai.request_id ? "selected" : ""}`}
                           style={spanStyle(start, first ?? stop)}
-                          aria-label={`Jump to AI waiting ${exchange.number}`}
-                          title={`Exchange ${exchange.number} · Waiting ${time(start)}–${time(first ?? stop)}`}
+                          aria-label={t("Jump to AI waiting {number}", {
+                            number: exchange.number,
+                          })}
+                          title={`${t("Exchange ")}${exchange.number} · ${t("Waiting")} ${time(start)}–${time(first ?? stop)}`}
                           onClick={() =>
                             seekMarker(
                               exchange.markers.find(
@@ -1011,17 +1062,22 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                             )
                           }
                         >
-                          <span>Waiting</span>
+                          <span>{t("Waiting")}</span>
                         </button>
                         {first !== undefined && (
                           <button
                             className={`timeline-phase response-phase ${ai.status} ${selectedRequestForView === ai.request_id ? "selected" : ""}`}
                             style={spanStyle(first, stop)}
-                            aria-label={`Jump to AI response ${exchange.number}`}
-                            title={`Exchange ${exchange.number} · Response ${time(first)}–${time(stop)} · ${terminalLabels[ai.status]}`}
+                            aria-label={t("Jump to AI response {number}", {
+                              number: exchange.number,
+                            })}
+                            title={`${t("Exchange ")}${exchange.number} · ${t("Response ")}${time(first)}–${time(stop)} · ${t(terminalLabels[ai.status])}`}
                             onClick={() => seekMarker(aiStart(ai.request_id))}
                           >
-                            <span>Response {exchange.number}</span>
+                            <span>
+                              {t("Response ")}
+                              {exchange.number}
+                            </span>
                           </button>
                         )}
                       </div>
@@ -1039,38 +1095,37 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
           <div className="timeline-legend">
             <span>
               <i className="legend-mic" />
-              Recorded audio
+              {t("Recorded audio")}
             </span>
             <span>
               <i className="legend-wait" />
-              AI waiting
+              {t("AI waiting")}
             </span>
             <span>
               <i className="legend-response" />
-              AI response
+              {t("AI response")}
             </span>
             {selectedWindow && (
               <span>
                 <i className="legend-window" />
-                Window boundary · dashed edges: playback context
+                {t("Window boundary · dashed edges: playback context")}
               </span>
             )}
             {audioGaps.length > 0 && (
               <span>
                 <i className="legend-gap" />
-                Gap / uncertain
+                {t("Gap / uncertain")}
               </span>
             )}
           </div>
           <p className="timeline-help">
-            Select a message, numbered marker, or waveform to listen from that
-            time. Waiting includes network and model processing; internal
-            generation start is not observed. Audio alignment is approximate.
-            Waveform amplitude is scaled for readability.
+            {t(
+              "Select a message, numbered marker, or waveform to listen from that time. Waiting includes network and model processing; internal generation start is not observed. Audio alignment is approximate. Waveform amplitude is scaled for readability.",
+            )}
           </p>
           {notice && (
             <p className="review-notice" role="status">
-              {notice}
+              {t(notice)}
             </p>
           )}
           <TranscriptionPanel
@@ -1081,18 +1136,24 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
           {selected && (
             <section
               className="exchange-timings"
-              aria-label={`Exchange ${selected.number} timing`}
+              aria-label={t("Exchange {number} timing", {
+                number: selected.number,
+              })}
             >
-              <h4>Exchange {selected.number} timing</h4>
+              <h4>
+                {t("Exchange ")}
+                {selected.number}
+                {t(" timing")}
+              </h4>
               <dl>
                 {displayedPhases.map((marker) => (
                   <div key={marker.event_id}>
-                    <dt>{marker.label}</dt>
+                    <dt>{t(marker.label)}</dt>
                     <dd>
                       <button
                         className="text-button"
                         disabled={marker.audio_position_seconds === null}
-                        title={marker.definition}
+                        title={t(marker.definition)}
                         onClick={() => seekMarker(marker)}
                       >
                         {time(marker.t_ms, 3)}
@@ -1104,14 +1165,17 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
             </section>
           )}
           <details className="review-event-details">
-            <summary>All event timings ({markers.length})</summary>
+            <summary>
+              {t("All event timings (")}
+              {markers.length})
+            </summary>
             <div className="review-event-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Session time</th>
-                    <th>Event</th>
-                    <th>Recording position</th>
+                    <th>{t("Session time")}</th>
+                    <th>{t("Event")}</th>
+                    <th>{t("Recording position")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1128,7 +1192,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
                       </td>
                       <td>
                         {marker.turn_index ? `${marker.turn_index} · ` : ""}
-                        {marker.label}
+                        {t(marker.label)}
                       </td>
                       <td>
                         {marker.audio_position_seconds === null

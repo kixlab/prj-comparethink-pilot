@@ -8,6 +8,7 @@ import {
   taskContext,
 } from "../tasks/registry";
 import type { Task } from "../tasks/types";
+import { localizeTask } from "../tasks/localization";
 import { readSse } from "../src/pilot/stream";
 import type { Configuration } from "../src/pilot/types";
 
@@ -146,8 +147,10 @@ export function pilotPlugin(
   commit: string,
   upstream: typeof fetch = fetch,
 ): Plugin {
-  const configurations = tasks.map((task) =>
-    makeConfiguration(env, version, commit, task),
+  const configurations = tasks.flatMap((task) =>
+    (["en", "ko"] as const).map((language) =>
+      makeConfiguration(env, version, commit, localizeTask(task, language)),
+    ),
   );
   const configurationById = new Map(
     configurations.map((config) => [config.config_id, config]),
@@ -176,13 +179,16 @@ export function pilotPlugin(
         if (path === "/api/config") {
           if (req.method !== "GET")
             return json(res, 405, { error: "GET only" });
-          const taskId =
-            new URL(
-              req.url ?? "/api/config",
-              "http://localhost",
-            ).searchParams.get("task_id") ?? defaultTask.task_id;
+          const params = new URL(req.url ?? "/api/config", "http://localhost")
+            .searchParams;
+          const taskId = params.get("task_id") ?? defaultTask.task_id;
+          const language = params.get("language") ?? "en";
+          if (!["en", "ko"].includes(language))
+            return json(res, 400, { error: "Unknown language" });
           const selected = configurations.find(
-            (config) => config.task.task_id === taskId,
+            (config) =>
+              config.task.task_id === taskId &&
+              config.task.language === language,
           );
           return selected
             ? json(res, 200, selected)

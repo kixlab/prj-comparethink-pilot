@@ -6,16 +6,11 @@ import type {
   Snapshot,
   TaskCatalog,
 } from "./types";
-import {
-  errorText,
-  id,
-  instructions,
-  instructionsForTask,
-  requestMicrophone,
-} from "./types";
+import { errorText, id, instructionsForTask, requestMicrophone } from "./types";
 import TravelTaskPanel from "./TravelTaskPanel";
 import { SessionEngine } from "./engine";
 import SessionReview from "./SessionReview";
+import { useI18n } from "./i18n";
 import {
   listSessions,
   loadSnapshot,
@@ -39,24 +34,25 @@ const seconds = (ms: number) =>
     .toString()
     .padStart(2, "0")}`;
 function TaskPanel({ config }: { config: Configuration }) {
+  const { t } = useI18n();
   const task = config.task;
   if (task.kind === "travelplanner") return <TravelTaskPanel task={task} />;
   return (
     <aside className="task-panel">
       <h2>{task.title}</h2>
       <p>{task.description}</p>
-      <h3>Initial state</h3>
-      <div className="blocks" aria-label="Initial block arrangement">
+      <h3>{t("Initial state")}</h3>
+      <div className="blocks" aria-label={t("Initial block arrangement")}>
         {task.initial_stacks.map((stack, i) => (
           <div key={i}>
             {[...stack].reverse().map((color) => (
               <span key={color} className={`block ${color}`}>
-                {blockLabels[color] ?? color}
+                {t(blockLabels[color] ?? color)}
               </span>
             ))}
           </div>
         ))}
-        <span className="table-label">Table</span>
+        <span className="table-label">{t("Table")}</span>
       </div>
       <ul className="state-list">
         {task.initial_state.map((s) => (
@@ -64,12 +60,12 @@ function TaskPanel({ config }: { config: Configuration }) {
         ))}
       </ul>
       <div className="goal">
-        <div className="eyebrow">Goal state</div>
+        <div className="eyebrow">{t("Goal state")}</div>
         {task.goal_state.map((s) => (
           <strong key={s}>{s}</strong>
         ))}
       </div>
-      <h3>Action rules</h3>
+      <h3>{t("Action rules")}</h3>
       <div className="action-list">
         {task.actions.map((a) => (
           <div key={a.name}>
@@ -87,11 +83,13 @@ function TaskPanel({ config }: { config: Configuration }) {
         ))}
       </ul>
       <details className="source">
-        <summary>Task source and original wording</summary>
+        <summary>{t("Task source and original wording")}</summary>
         <p>
-          PlanBench · task_1_plan_generation · instance{" "}
-          {task.source.instance_id}. The rules and target problem are shown
-          below. The separate example and reference solution are excluded.
+          {t("PlanBench · task_1_plan_generation · instance")}{" "}
+          {task.source.instance_id}
+          {t(
+            ". The rules and target problem are shown below. The separate example and reference solution are excluded.",
+          )}
         </p>
         <pre>{task.original.rules}</pre>
         <p>{task.original.initial_state}</p>
@@ -107,6 +105,7 @@ function ChatMessage({
   message: Message;
   engine: SessionEngine;
 }) {
+  const { t } = useI18n();
   useLayoutEffect(() => {
     if (message.role === "assistant" && message.content) {
       const frame = requestAnimationFrame(() =>
@@ -128,24 +127,27 @@ function ChatMessage({
       data-message-id={message.message_id}
     >
       <div className="message-meta">
-        <strong>{message.role === "user" ? "You" : "AI"}</strong>
+        <strong>{message.role === "user" ? t("You") : "AI"}</strong>
         <time>{seconds(message.created_t_ms)}</time>
-        <span>{status}</span>
+        <span>{t(status)}</span>
       </div>
       <div className="message-text">
         {message.content ||
           (message.status === "streaming" ? (
             <span className="waiting">
-              Waiting for a response<span>…</span>
+              {t("Waiting for a response")}
+              <span>…</span>
             </span>
           ) : (
-            "No text was received."
+            t("No text was received.")
           ))}
       </div>
     </article>
   );
 }
 export default function App() {
+  const { language, setLanguage, t } = useI18n();
+  const [admin, setAdmin] = useState(false);
   const [config, setConfig] = useState<Configuration | null>(null);
   const [catalog, setCatalog] = useState<TaskCatalog | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState("");
@@ -173,10 +175,22 @@ export default function App() {
   const composing = useRef(false);
   const micErrors = useRef<{ at_utc: string; error: string }[]>([]);
   const chatBottom = useRef<HTMLDivElement>(null);
-  const refreshSessions = () =>
-    listSessions()
-      .then(setSaved)
-      .catch((e) => setError(`Storage error: ${errorText(e)}`));
+  const adminCandidate = participant.trim().toLowerCase() === "admin";
+  function enterAdmin() {
+    if (
+      !adminCandidate ||
+      phase !== "mic" ||
+      working ||
+      micState === "recording"
+    )
+      return;
+    setError("");
+    setReview(null);
+    setMicState("idle");
+    setMicConfirmed(false);
+    setTestUrl("");
+    setAdmin(true);
+  }
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/tasks")
@@ -203,9 +217,9 @@ export default function App() {
       .catch((e) => {
         if (!cancelled) setError(errorText(e));
       });
-    void openDatabase()
-      .then(refreshSessions)
-      .catch((e) => setError(`Storage error: ${errorText(e)}`));
+    void openDatabase().catch((e) =>
+      setError(t("Storage error: {error}", { error: errorText(e) })),
+    );
     return () => {
       cancelled = true;
       const recorder = testRecorder.current;
@@ -213,12 +227,30 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
+    if (!admin) return;
+    let cancelled = false;
+    void listSessions()
+      .then((sessions) => {
+        if (!cancelled) setSaved(sessions);
+      })
+      .catch((e) => {
+        if (!cancelled)
+          setError(t("Storage error: {error}", { error: errorText(e) }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [admin]);
+  useEffect(() => {
     if (!selectedTaskId) return;
     const controller = new AbortController();
     setConfig(null);
-    void fetch(`/api/config?task_id=${encodeURIComponent(selectedTaskId)}`, {
-      signal: controller.signal,
-    })
+    void fetch(
+      `/api/config?task_id=${encodeURIComponent(selectedTaskId)}&language=${language}`,
+      {
+        signal: controller.signal,
+      },
+    )
       .then(async (r) => {
         if (!r.ok) throw new Error("Could not load the selected task.");
         return r.json() as Promise<Configuration>;
@@ -230,7 +262,7 @@ export default function App() {
         if (!controller.signal.aborted) setError(errorText(e));
       });
     return () => controller.abort();
-  }, [selectedTaskId]);
+  }, [selectedTaskId, language]);
   useEffect(() => {
     if (!testUrl) return;
     return () => URL.revokeObjectURL(testUrl);
@@ -326,7 +358,7 @@ export default function App() {
         at_utc: new Date().toISOString(),
         error: errorText(e),
       });
-      setError(`Microphone unavailable: ${errorText(e)}`);
+      setError(t("Microphone unavailable: {error}", { error: errorText(e) }));
       setMicState("idle");
     } finally {
       setWorking(false);
@@ -334,6 +366,10 @@ export default function App() {
   }
   async function begin() {
     if (!config || working) return;
+    if (adminCandidate) {
+      enterAdmin();
+      return;
+    }
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(participant)) {
       setError(
         "Use 1–64 letters, numbers, underscores, or hyphens for the participant ID.",
@@ -404,7 +440,6 @@ export default function App() {
       await engine.finish(answer);
       setPhase("done");
       setReview({ ...engine.snapshot });
-      await refreshSessions();
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -442,7 +477,10 @@ export default function App() {
     } catch (e) {
       if (current) engine?.log("export_error", { error: errorText(e) });
       setError(
-        `Could not prepare the download: ${errorText(e)}. You can retry from Saved sessions.`,
+        t(
+          "Could not prepare the download: {error}. You can retry from Saved sessions.",
+          { error: errorText(e) },
+        ),
       );
     } finally {
       setWorking(false);
@@ -478,146 +516,196 @@ export default function App() {
         >
           CompareThink
         </a>
-        <span className="header-note">Planning study</span>
-      </header>
-      <nav className="progress" aria-label="Study progress">
-        {steps.map((s, i) => (
-          <div
-            className={
-              i === phaseNumber ? "current" : i < phaseNumber ? "past" : ""
+        <span className="header-note">{t("Planning study")}</span>
+        <label className="language-select">
+          {t("Language")}
+          <select
+            aria-label={t("Language")}
+            value={language}
+            disabled={
+              phase === "active" ||
+              phase === "guide" ||
+              working ||
+              micState === "recording"
             }
-            aria-current={i === phaseNumber ? "step" : undefined}
-            key={s}
+            onChange={(event) => setLanguage(event.target.value as "en" | "ko")}
           >
-            <span>{i + 1}.</span>
-            {s}
-          </div>
-        ))}
-      </nav>
+            <option value="en">English</option>
+            <option value="ko">한국어</option>
+          </select>
+        </label>
+      </header>
+      {!admin && (
+        <nav className="progress" aria-label={t("Study progress")}>
+          {steps.map((s, i) => (
+            <div
+              className={
+                i === phaseNumber ? "current" : i < phaseNumber ? "past" : ""
+              }
+              aria-current={i === phaseNumber ? "step" : undefined}
+              key={s}
+            >
+              <span>{i + 1}.</span>
+              {t(s)}
+            </div>
+          ))}
+        </nav>
+      )}
       {error && (
         <div className="alert error" role="alert">
-          {error}
+          {t(error)}
         </div>
       )}
-      {phase === "mic" && (
+      {!admin && phase === "mic" && (
         <main className="onboarding">
           <section className="setup-card">
-            <h1>Session setup</h1>
-            <label htmlFor="study-task">Task</label>
-            <select
-              id="study-task"
-              aria-label="Task"
-              value={selectedTaskId}
-              disabled={!catalog || working || micState === "recording"}
-              onChange={(e) => {
-                setConfig(null);
-                setError("");
-                setSelectedTaskId(e.target.value);
-                const option = catalog?.tasks.find(
-                  (task) => task.task_id === e.target.value,
-                );
-                const url = new URL(window.location.href);
-                url.searchParams.set("task", option?.kind ?? e.target.value);
-                history.replaceState(null, "", url);
-              }}
-            >
-              {!catalog || !selectedTaskId ? (
-                <option value="">
-                  {catalog ? "Select a task" : "Loading tasks…"}
-                </option>
-              ) : null}
-              {catalog?.tasks.map((task) => (
-                <option key={task.task_id} value={task.task_id}>
-                  {task.title}
-                </option>
-              ))}
-            </select>
-            <p className="task-summary">
-              {catalog?.tasks.find((task) => task.task_id === selectedTaskId)
-                ?.summary ?? ""}
-            </p>
-            <h2>Microphone check</h2>
-            <p>
-              Record a short sample, then play it back to check that your voice
-              is audible.
-            </p>
+            <h1>{t("Session setup")}</h1>
             <label>
-              Participant ID
+              {t("Participant ID")}
               <input
-                aria-label="Participant ID"
+                aria-label={t("Participant ID")}
                 value={participant}
                 onChange={(e) => setParticipant(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && adminCandidate) {
+                    e.preventDefault();
+                    enterAdmin();
+                  }
+                }}
+                disabled={working || micState === "recording"}
                 maxLength={64}
                 autoComplete="off"
               />
-              <small>Do not enter your name or contact details.</small>
+              <small>{t("Do not enter your name or contact details.")}</small>
             </label>
-            <div
-              className={`mic-test ${micState === "recording" ? "live" : ""}`}
-            >
-              <strong>
-                {micState === "recording"
-                  ? "Test recording in progress"
-                  : micState === "ready"
-                    ? "Test recording ready"
-                    : "Microphone not tested"}
-              </strong>
-              <div className="level-track">
-                <i style={{ width: `${level}%` }} />
-              </div>
-              <small>
-                {micState === "recording"
-                  ? "Speak a sentence or two."
-                  : "The test recording is not included in the study data."}
-              </small>
-            </div>
-            {micState === "recording" ? (
+            {adminCandidate ? (
               <button
-                className="secondary full"
-                onClick={() => testRecorder.current?.stop()}
+                className="primary full"
+                onClick={enterAdmin}
+                disabled={working || micState === "recording"}
               >
-                Stop test recording
+                {t("Open admin")}
               </button>
             ) : (
-              <button
-                className="secondary full"
-                disabled={working}
-                onClick={() => void testMic()}
-              >
-                {micState === "ready"
-                  ? "Test microphone again"
-                  : "Start microphone test"}
-              </button>
-            )}
-            {testUrl && (
               <>
-                <audio
-                  aria-label="Microphone test playback"
-                  src={testUrl}
-                  controls
-                />
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={micConfirmed}
-                    onChange={(e) => setMicConfirmed(e.target.checked)}
-                  />
-                  I played the recording and could hear my voice.
-                </label>
+                <label htmlFor="study-task">{t("Task")}</label>
+                <select
+                  id="study-task"
+                  aria-label={t("Task")}
+                  value={selectedTaskId}
+                  disabled={!catalog || working || micState === "recording"}
+                  onChange={(e) => {
+                    setConfig(null);
+                    setError("");
+                    setSelectedTaskId(e.target.value);
+                    const option = catalog?.tasks.find(
+                      (task) => task.task_id === e.target.value,
+                    );
+                    const url = new URL(window.location.href);
+                    url.searchParams.set(
+                      "task",
+                      option?.kind ?? e.target.value,
+                    );
+                    history.replaceState(null, "", url);
+                  }}
+                >
+                  {!catalog || !selectedTaskId ? (
+                    <option value="">
+                      {catalog ? t("Select a task") : t("Loading tasks…")}
+                    </option>
+                  ) : null}
+                  {catalog?.tasks.map((task) => (
+                    <option key={task.task_id} value={task.task_id}>
+                      {t(task.title)}
+                    </option>
+                  ))}
+                </select>
+                <p className="task-summary">
+                  {t(
+                    catalog?.tasks.find(
+                      (task) => task.task_id === selectedTaskId,
+                    )?.summary ?? "",
+                  )}
+                </p>
+                <h2>{t("Microphone check")}</h2>
+                <p>
+                  {t(
+                    "Record a short sample, then play it back to check that your voice is audible.",
+                  )}
+                </p>
+                <div
+                  className={`mic-test ${micState === "recording" ? "live" : ""}`}
+                >
+                  <strong>
+                    {micState === "recording"
+                      ? t("Test recording in progress")
+                      : micState === "ready"
+                        ? t("Test recording ready")
+                        : t("Microphone not tested")}
+                  </strong>
+                  <div className="level-track">
+                    <i style={{ width: `${level}%` }} />
+                  </div>
+                  <small>
+                    {micState === "recording"
+                      ? t("Speak a sentence or two.")
+                      : t(
+                          "The test recording is not included in the study data.",
+                        )}
+                  </small>
+                </div>
+                {micState === "recording" ? (
+                  <button
+                    className="secondary full"
+                    onClick={() => testRecorder.current?.stop()}
+                  >
+                    {t("Stop test recording")}
+                  </button>
+                ) : (
+                  <button
+                    className="secondary full"
+                    disabled={working}
+                    onClick={() => void testMic()}
+                  >
+                    {micState === "ready"
+                      ? t("Test microphone again")
+                      : t("Start microphone test")}
+                  </button>
+                )}
+                {testUrl && (
+                  <>
+                    <audio
+                      aria-label={t("Microphone test playback")}
+                      src={testUrl}
+                      controls
+                    />
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={micConfirmed}
+                        onChange={(e) => setMicConfirmed(e.target.checked)}
+                      />
+                      {t("I played the recording and could hear my voice.")}
+                    </label>
+                  </>
+                )}
+                <button
+                  className="primary full"
+                  disabled={
+                    !micConfirmed ||
+                    !config ||
+                    working ||
+                    micState === "recording"
+                  }
+                  onClick={() => {
+                    setError("");
+                    setPhase("guide");
+                  }}
+                >
+                  {t("Continue to instructions")}
+                </button>
               </>
             )}
-            <button
-              className="primary full"
-              disabled={
-                !micConfirmed || !config || working || micState === "recording"
-              }
-              onClick={() => {
-                setError("");
-                setPhase("guide");
-              }}
-            >
-              Continue to instructions
-            </button>
           </section>
         </main>
       )}
@@ -625,29 +713,33 @@ export default function App() {
         <main className="guide-grid">
           <TaskPanel config={config} />
           <section className="guide-main">
-            <h1>Instructions</h1>
+            <h1>{t("Instructions")}</h1>
             <div className="instruction-card">
               <div>
-                <h3>Task and chat</h3>
+                <h3>{t("Task and chat")}</h3>
                 <p>{instructionsForTask(config.task).task}</p>
               </div>
             </div>
             <div className="instruction-card">
               <div>
-                <h3>Think-aloud instructions</h3>
-                <p>{instructions.think_aloud}</p>
+                <h3>{t("Think-aloud instructions")}</h3>
+                <p>{instructionsForTask(config.task).think_aloud}</p>
               </div>
             </div>
             <div className="instruction-card">
               <div>
-                <h3>Submit your final plan</h3>
+                <h3>{t("Submit your final plan")}</h3>
                 <p>{config.task.final_instruction}</p>
               </div>
             </div>
-            <div className="notice">{instructions.audio_notice}</div>
+            <div className="notice">
+              {instructionsForTask(config.task).audio_notice}
+            </div>
             {!config.api_ready && (
               <div className="alert">
-                The AI service is not configured. Please contact the researcher.
+                {t(
+                  "The AI service is not configured. Please contact the researcher.",
+                )}
               </div>
             )}
             <button
@@ -655,14 +747,14 @@ export default function App() {
               disabled={working || !config.api_ready}
               onClick={() => void begin()}
             >
-              {working ? "Preparing recording…" : "Start task"}
+              {working ? t("Preparing recording…") : t("Start task")}
             </button>
             <button
               className="text-button"
               disabled={working}
               onClick={() => setPhase("mic")}
             >
-              Check microphone again
+              {t("Check microphone again")}
             </button>
           </section>
         </main>
@@ -675,38 +767,44 @@ export default function App() {
                 className={`record-dot ${engine.audioHealthy ? "live" : ""}`}
               />
               <strong>
-                {engine.audioHealthy ? "Recording" : "Recording stopped"}
+                {engine.audioHealthy ? t("Recording") : t("Recording stopped")}
               </strong>
               <span className="elapsed">{seconds(elapsed)}</span>
             </div>
-            <span>Participant: {engine.session.participant_id}</span>
+            <span>
+              {t("Participant: ")}
+              {engine.session.participant_id}
+            </span>
             <span className="session-task">
-              Task: {engine.session.config.task.title}
+              {t("Task: ")}
+              {engine.session.config.task.title}
             </span>
             <span className="save-state">
               {engine.journal.blocked
-                ? "Storage error · retained in memory"
+                ? t("Storage error · retained in memory")
                 : engine.journal.pending.length
-                  ? "Saving…"
-                  : "Saved locally"}
+                  ? t("Saving…")
+                  : t("Saved locally")}
             </span>
           </div>
           {engine.journal.blocked && (
             <div className="alert error">
-              New messages are disabled because local storage failed. Keep this
-              tab open and retry saving or download the current record.
+              {t(
+                "New messages are disabled because local storage failed. Keep this tab open and retry saving or download the current record.",
+              )}
               <button onClick={() => void engine.retryStorage()}>
-                Retry saving
+                {t("Retry saving")}
               </button>
               <button onClick={() => void exportSession(engine.snapshot, true)}>
-                Download current record
+                {t("Download current record")}
               </button>
             </div>
           )}
           {!engine.audioHealthy && (
             <div className="alert error">
-              Recording stopped. The missing interval will remain in the study
-              record.
+              {t(
+                "Recording stopped. The missing interval will remain in the study record.",
+              )}
               <button
                 onClick={() =>
                   void engine
@@ -714,7 +812,7 @@ export default function App() {
                     .catch((e) => setError(errorText(e)))
                 }
               >
-                Reconnect microphone
+                {t("Reconnect microphone")}
               </button>
             </div>
           )}
@@ -723,7 +821,7 @@ export default function App() {
             <section className="chat-panel">
               <div className="chat-heading">
                 <div>
-                  <h2>Chat</h2>
+                  <h2>{t("Chat")}</h2>
                 </div>
                 <span className="model-label">
                   {engine.session.config.model}
@@ -731,13 +829,13 @@ export default function App() {
               </div>
               <div
                 className="chat-history"
-                aria-label="Chat history"
+                aria-label={t("Chat history")}
                 aria-live="polite"
               >
                 {messages.length === 0 && (
                   <div className="empty-chat">
-                    <h3>No messages yet.</h3>
-                    <p>You may chat with the AI freely.</p>
+                    <h3>{t("No messages yet.")}</h3>
+                    <p>{t("You may chat with the AI freely.")}</p>
                   </div>
                 )}
                 {messages.map((m) => (
@@ -747,12 +845,12 @@ export default function App() {
               </div>
               <div className="composer">
                 <label htmlFor="chat-input" className="sr-only">
-                  Message to AI
+                  {t("Message to AI")}
                 </label>
                 <textarea
                   id="chat-input"
                   value={prompt}
-                  placeholder="Type a message…"
+                  placeholder={t("Type a message…")}
                   disabled={engine.ending}
                   onChange={(e) => setPrompt(e.currentTarget.value)}
                   onCompositionStart={() => {
@@ -775,13 +873,15 @@ export default function App() {
                   }}
                 />
                 <div className="composer-footer">
-                  <small>Enter to send · Shift+Enter for a new line</small>
+                  <small>
+                    {t("Enter to send · Shift+Enter for a new line")}
+                  </small>
                   {engine.busy ? (
                     <button
                       className="secondary compact"
                       onClick={() => engine.cancel()}
                     >
-                      Stop response
+                      {t("Stop response")}
                     </button>
                   ) : (
                     <button
@@ -794,34 +894,36 @@ export default function App() {
                       }
                       onClick={send}
                     >
-                      Send
+                      {t("Send")}
                     </button>
                   )}
                 </div>
               </div>
               <div className="task-footer">
-                <span>Submit your final plan separately from the chat.</span>
+                <span>
+                  {t("Submit your final plan separately from the chat.")}
+                </span>
                 <button
                   className="secondary"
                   onClick={() => setShowFinal(!showFinal)}
                   disabled={engine.ending}
                 >
-                  {showFinal ? "Close final plan" : "Write final plan"}
+                  {showFinal ? t("Close final plan") : t("Write final plan")}
                 </button>
               </div>
               {showFinal && (
                 <section className="final-panel">
-                  <h3>Final plan</h3>
+                  <h3>{t("Final plan")}</h3>
                   <p>{engine.session.config.task.final_instruction}</p>
                   <textarea
-                    aria-label="Final plan"
+                    aria-label={t("Final plan")}
                     rows={6}
                     value={finalAnswer}
                     onChange={(e) => setFinalAnswer(e.currentTarget.value)}
                     placeholder={
                       engine.session.config.task.kind === "travelplanner"
-                        ? "Enter your day-by-day itinerary."
-                        : "Enter the actions in order."
+                        ? t("Enter your day-by-day itinerary.")
+                        : t("Enter the actions in order.")
                     }
                   />
                   <button
@@ -829,7 +931,7 @@ export default function App() {
                     disabled={!finalAnswer.trim() || working}
                     onClick={() => void finish(finalAnswer)}
                   >
-                    Submit final plan and end session
+                    {t("Submit final plan and end session")}
                   </button>
                 </section>
               )}
@@ -838,7 +940,7 @@ export default function App() {
                 disabled={working}
                 onClick={() => void finish()}
               >
-                End session without submitting
+                {t("End session without submitting")}
               </button>
             </section>
           </main>
@@ -848,11 +950,13 @@ export default function App() {
         <main className="completion">
           <div className="completion-heading">
             <div>
-              <h1>Session ended</h1>
+              <h1>{t("Session ended")}</h1>
               <p>
                 {engine.session.final_answer
-                  ? "Review your conversation and think-aloud recording below."
-                  : "The session ended without a final plan submission."}
+                  ? t(
+                      "Review your conversation and think-aloud recording below.",
+                    )
+                  : t("The session ended without a final plan submission.")}
               </p>
             </div>
             <div className="completion-actions">
@@ -861,21 +965,22 @@ export default function App() {
                 disabled={working}
                 onClick={() => void exportSession(engine.snapshot, true)}
               >
-                Download session ZIP
+                {t("Download session ZIP")}
               </button>
               <button
                 className="secondary"
                 onClick={() => window.location.reload()}
                 disabled={engine.journal.pending.length > 0}
               >
-                Prepare a new session
+                {t("Prepare a new session")}
               </button>
             </div>
           </div>
           {engine.journal.blocked && (
             <div className="alert error" role="alert">
-              Some data has not been saved and remains in this tab. Keep the tab
-              open and retry saving or download the session ZIP.
+              {t(
+                "Some data has not been saved and remains in this tab. Keep the tab open and retry saving or download the session ZIP.",
+              )}
             </div>
           )}
           <div
@@ -883,15 +988,16 @@ export default function App() {
           >
             <strong>
               {engine.session.collection_status === "complete"
-                ? "Complete"
-                : "Incomplete collection · errors or gaps recorded"}
+                ? t("Complete")
+                : t("Incomplete collection · errors or gaps recorded")}
             </strong>
             <span>
-              Human prompts:{" "}
-              {engine.messages.filter((m) => m.role === "user").length} · AI
-              responses:{" "}
-              {engine.messages.filter((m) => m.role === "assistant").length} ·
-              Recordings: {engine.session.audio_segments.length}
+              {t("Human prompts:")}{" "}
+              {engine.messages.filter((m) => m.role === "user").length}
+              {t(" · AI responses:")}{" "}
+              {engine.messages.filter((m) => m.role === "assistant").length}
+              {t(" · Recordings: ")}
+              {engine.session.audio_segments.length}
             </span>
             {engine.session.issues.map((issue, i) => (
               <small key={i}>{issue}</small>
@@ -902,7 +1008,7 @@ export default function App() {
               className="secondary"
               onClick={() => void engine.retryStorage()}
             >
-              Retry saving
+              {t("Retry saving")}
             </button>
           )}
           {review && (
@@ -910,62 +1016,90 @@ export default function App() {
           )}
         </main>
       )}
-      {saved.length > 0 && phase !== "active" && (
-        <details className="saved-sessions" open={phase !== "done"}>
-          <summary>Saved sessions ({saved.length})</summary>
-          <div>
-            <h2>Saved sessions</h2>
-            <p>
-              You can download saved sessions again. Unfinished sessions are
-              exported as incomplete.
-            </p>
+      {admin && (
+        <main className="admin-panel">
+          <div className="completion-heading">
+            <h1>{t("Admin")}</h1>
+            <button
+              className="secondary"
+              onClick={() => {
+                setAdmin(false);
+                setSaved([]);
+                setReview(null);
+                setError("");
+                setParticipant(`p-${id().slice(0, 8)}`);
+              }}
+            >
+              {t("Back to participant setup")}
+            </button>
           </div>
-          {saved.map((s) => (
-            <div className="saved-row" key={s.session_id}>
-              <div>
-                <strong>{s.participant_id}</strong>
-                <small>{s.config.task.title}</small>
-                <small>
-                  {new Date(s.clock.origin_utc).toLocaleString("en-GB")} ·{" "}
-                  {s.session_id.slice(0, 8)} ·{" "}
-                  {s.status === "active" || s.status === "interrupted"
-                    ? "Interrupted or unfinished"
-                    : s.collection_status === "complete"
-                      ? "Completed"
-                      : "Incomplete collection"}
-                </small>
-              </div>
-              <button
-                className="secondary compact"
-                disabled={working}
-                onClick={() =>
-                  void loadSnapshot(s.session_id)
-                    .then((snapshot) => exportSession(snapshot))
-                    .catch((e) => setError(errorText(e)))
-                }
-              >
-                Download ZIP again
-              </button>
-              <button
-                className="text-button"
-                onClick={() =>
-                  void loadSnapshot(s.session_id)
-                    .then(setReview)
-                    .catch((e) => setError(errorText(e)))
-                }
-              >
-                Review recording
-              </button>
+          <section className="saved-sessions" aria-label={t("Saved sessions")}>
+            <div>
+              <h2>{t("Saved sessions")}</h2>
+              <p>
+                {t(
+                  "You can download saved sessions again. Unfinished sessions are exported as incomplete.",
+                )}
+              </p>
             </div>
-          ))}
-          {review && phase !== "done" && (
-            <SessionReview key={review.session.session_id} snapshot={review} />
-          )}
-        </details>
+            {!saved.length && <p>{t("No saved sessions on this browser.")}</p>}
+            {saved.map((s) => (
+              <div className="saved-row" key={s.session_id}>
+                <div>
+                  <strong>{s.participant_id}</strong>
+                  <small>{t(s.config.task.title)}</small>
+                  <small>
+                    {s.ui_language === "ko" || s.config.task.language === "ko"
+                      ? "한국어"
+                      : "English"}
+                  </small>
+                  <small>
+                    {new Date(s.clock.origin_utc).toLocaleString(
+                      language === "ko" ? "ko-KR" : "en-GB",
+                    )}{" "}
+                    · {s.session_id.slice(0, 8)} ·{" "}
+                    {s.status === "active" || s.status === "interrupted"
+                      ? t("Interrupted or unfinished")
+                      : s.collection_status === "complete"
+                        ? t("Completed")
+                        : t("Incomplete collection")}
+                  </small>
+                </div>
+                <button
+                  className="secondary compact"
+                  disabled={working}
+                  onClick={() =>
+                    void loadSnapshot(s.session_id)
+                      .then((snapshot) => exportSession(snapshot))
+                      .catch((e) => setError(errorText(e)))
+                  }
+                >
+                  {t("Download ZIP again")}
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() =>
+                    void loadSnapshot(s.session_id)
+                      .then(setReview)
+                      .catch((e) => setError(errorText(e)))
+                  }
+                >
+                  {t("Review recording")}
+                </button>
+              </div>
+            ))}
+            {review && (
+              <SessionReview
+                key={review.session.session_id}
+                snapshot={review}
+              />
+            )}
+          </section>
+        </main>
       )}
       <footer className="page-footer">
-        <span>CompareThink research study</span>
-        <span>Research data collection</span>
+        <span>{t("CompareThink research study")}</span>
+        <span>{t("Research data collection")}</span>
       </footer>
     </div>
   );

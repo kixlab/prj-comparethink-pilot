@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import type { Snapshot } from "./types";
 import { errorText, id } from "./types";
@@ -52,6 +53,7 @@ export default function TranscriptionPanel({
   playhead: number;
   onSeek: (t: number) => void;
 }) {
+  const { t } = useI18n();
   const sessionId = snapshot.session.session_id;
   const [configuration, setConfiguration] = useState<SttConfiguration | null>(
     null,
@@ -164,7 +166,10 @@ export default function TranscriptionPanel({
         if (abort.signal.aborted) break;
         const segment = targets[index];
         setProgress(
-          `Transcribing recording ${index + 1} of ${targets.length}…`,
+          t("Transcribing recording {number} of {total}…", {
+            number: index + 1,
+            total: targets.length,
+          }),
         );
         const chunks = snapshot.audio
           .filter((chunk) => chunk.segment_id === segment.segment_id)
@@ -276,16 +281,16 @@ export default function TranscriptionPanel({
   return (
     <section
       className="transcription-panel"
-      aria-label="Think-aloud transcript"
+      aria-label={t("Think-aloud transcript")}
     >
       <div className="transcription-heading">
-        <h3>Think-aloud transcript</h3>
+        <h3>{t("Think-aloud transcript")}</h3>
         {busy ? (
           <button
             className="secondary compact"
             onClick={() => controller.current?.abort()}
           >
-            Cancel transcription
+            {t("Cancel transcription")}
           </button>
         ) : (
           <button
@@ -294,36 +299,45 @@ export default function TranscriptionPanel({
             onClick={() => void generate()}
           >
             {allCurrent
-              ? "Transcribe again"
+              ? t("Transcribe again")
               : visible.length
-                ? "Transcribe remaining recordings"
-                : "Generate transcript"}
+                ? t("Transcribe remaining recordings")
+                : t("Generate transcript")}
           </button>
         )}
       </div>
       {configuration && configuration.provider !== "off" && (
         <p className="transcription-provider">
           {configuration.provider === "local-whisper"
-            ? "Local Whisper"
+            ? t("Local Whisper")
             : "STT API"}{" "}
-          · {configuration.model} · Language:{" "}
+          · {configuration.model}
+          {t(" · Language:")}{" "}
           {configuration.language === "auto"
-            ? "auto-detect"
+            ? t("auto-detect")
             : configuration.language}
         </p>
       )}
       {!configuration?.ready && (
         <p className="transcription-help">
-          Transcription is not configured on the server. The original recording
-          is available above.
+          {t(
+            "Transcription is not configured on the server. The original recording is available above.",
+          )}
         </p>
       )}
       {configuration?.ready && (
         <p className="transcription-help">
           {configuration.remote_audio
-            ? `Generate sends recording audio to the transcription service (${configuration.api_origin}).`
-            : "Generate transcribes the recording on the app server without an external STT API."}{" "}
-          Audio and transcripts are never included in the chat AI request.
+            ? t(
+                "Generate sends recording audio to the transcription service ({origin}).",
+                { origin: configuration.api_origin ?? "" },
+              )
+            : t(
+                "Generate transcribes the recording on the app server without an external STT API.",
+              )}{" "}
+          {t(
+            "Audio and transcripts are never included in the chat AI request.",
+          )}
         </p>
       )}
       {busy && (
@@ -333,19 +347,21 @@ export default function TranscriptionPanel({
       )}
       {error && (
         <p className="transcription-error" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
       {unfinished && (
         <p className="transcription-error">
-          A previous attempt ended without a result. Generate again to retry.
+          {t(
+            "A previous attempt ended without a result. Generate again to retry.",
+          )}
         </p>
       )}
       {(storageError || unsavedTranscriptionIds(sessionId).length > 0) && (
         <div className="transcription-error" role="alert">
-          Some transcript entries could not be saved or loaded. Keep this tab
-          open; the session ZIP includes the transcript entries currently
-          available here.
+          {t(
+            "Some transcript entries could not be saved or loaded. Keep this tab open; the session ZIP includes the transcript entries currently available here.",
+          )}
           <button
             onClick={() =>
               void retryTranscriptionWrites(sessionId)
@@ -357,35 +373,36 @@ export default function TranscriptionPanel({
                 .catch((e) => setStorageError(errorText(e)))
             }
           >
-            Retry saving transcript
+            {t("Retry saving transcript")}
           </button>
         </div>
       )}
       {!visible.length && !busy && (
         <p className="transcription-empty">
-          No transcript yet. Generate one from the saved recording.
+          {t("No transcript yet. Generate one from the saved recording.")}
         </p>
       )}
       {visible.length > 0 && (
         <>
           <p className="transcription-help">
-            Machine-generated text · Estimated timings · Verify against the
-            recording. Click a time to listen.
+            {t(
+              "Machine-generated text · Estimated timings · Verify against the recording. Click a time to listen.",
+            )}
           </p>
           <div className="transcript-cues" ref={listEl}>
             {visible.map((record) => (
               <div key={record.entry_id} className="transcript-recording">
                 <div className="transcript-recording-meta">
-                  Recording{" "}
+                  {t("Recording ")}
                   {snapshot.session.audio_segments.findIndex(
                     (s) => s.segment_id === record.segment_id,
                   ) + 1}{" "}
                   ·{" "}
                   {record.configuration.provider === "local-whisper"
-                    ? "Local Whisper"
+                    ? t("Local Whisper")
                     : "STT API"}{" "}
                   · {record.configuration.model}
-                  {record.status === "partial" ? " · Partial" : ""}
+                  {record.status === "partial" ? t(" · Partial") : ""}
                 </div>
                 {record.result?.cues.map((cue) => (
                   <div
@@ -394,7 +411,9 @@ export default function TranscriptionPanel({
                   >
                     <button
                       className="text-button"
-                      aria-label={`Play transcript at ${time(cue.start_t_ms)}`}
+                      aria-label={t("Play transcript at {time}", {
+                        time: time(cue.start_t_ms),
+                      })}
                       onClick={() => onSeek(cue.start_t_ms)}
                     >
                       {time(cue.start_t_ms)}
@@ -406,7 +425,7 @@ export default function TranscriptionPanel({
                 {record.result?.untimed_text && (
                   <div className="transcript-untimed">
                     <small>
-                      No speech timestamps were returned for this text.
+                      {t("No speech timestamps were returned for this text.")}
                     </small>
                     <p>{record.result.untimed_text}</p>
                   </div>
@@ -414,7 +433,7 @@ export default function TranscriptionPanel({
                 {!record.result?.cues.length &&
                   !record.result?.untimed_text && (
                     <p className="transcription-empty">
-                      No speech was recognized in this recording.
+                      {t("No speech was recognized in this recording.")}
                     </p>
                   )}
                 {record.result?.warnings.map((warning, index) => (
@@ -429,14 +448,17 @@ export default function TranscriptionPanel({
       )}
       {attempts.size > 0 && (
         <details className="transcription-history">
-          <summary>Transcription history ({attempts.size})</summary>
+          <summary>
+            {t("Transcription history (")}
+            {attempts.size})
+          </summary>
           <ul>
             {[...attempts.values()].map((entry) => (
               <li key={entry.attempt_id}>
                 <strong>
                   {entry.status === "started" && !busy
-                    ? "Unfinished"
-                    : entry.status}
+                    ? t("Unfinished")
+                    : t(entry.status)}
                 </strong>{" "}
                 · {entry.configuration.provider} · {entry.configuration.model}
                 <small>
@@ -447,8 +469,9 @@ export default function TranscriptionPanel({
             ))}
           </ul>
           <p>
-            Every attempt is retained in the session ZIP. Retries do not replace
-            earlier results.
+            {t(
+              "Every attempt is retained in the session ZIP. Retries do not replace earlier results.",
+            )}
           </p>
         </details>
       )}

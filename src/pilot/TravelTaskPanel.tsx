@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import type { TravelPlannerTask, TravelReference } from "../../tasks/types";
 
 function ReferenceSection({
@@ -7,6 +8,7 @@ function ReferenceSection({
   title: string;
   data: TravelReference;
 }) {
+  const { t } = useI18n();
   const columns =
     typeof data === "string"
       ? []
@@ -14,7 +16,7 @@ function ReferenceSection({
   return (
     <details className="travel-reference-section">
       <summary>
-        {title}
+        {t(title)}
         {Array.isArray(data) ? ` (${data.length})` : ""}
       </summary>
       {typeof data === "string" ? (
@@ -24,15 +26,15 @@ function ReferenceSection({
           className="reference-table-scroll"
           tabIndex={0}
           role="region"
-          aria-label={`${title} table`}
+          aria-label={t("{title} table", { title: t(title) })}
         >
           <table>
-            <caption>{title}</caption>
+            <caption>{t(title)}</caption>
             <thead>
               <tr>
                 {columns.map((column) => (
-                  <th key={column} scope="col">
-                    {column}
+                  <th key={t(column)} scope="col">
+                    {t(column)}
                   </th>
                 ))}
               </tr>
@@ -41,7 +43,7 @@ function ReferenceSection({
               {data.map((row, i) => (
                 <tr key={i}>
                   {columns.map((column) => (
-                    <td key={column}>
+                    <td key={t(column)}>
                       {row[column] == null ? "—" : String(row[column])}
                     </td>
                   ))}
@@ -51,17 +53,18 @@ function ReferenceSection({
           </table>
         </div>
       ) : (
-        <p>No options were supplied for this section.</p>
+        <p>{t("No options were supplied for this section.")}</p>
       )}
     </details>
   );
 }
 export default function TravelTaskPanel({ task }: { task: TravelPlannerTask }) {
+  const { t } = useI18n();
   return (
     <aside className="task-panel travel-task-panel">
       <h2>{task.title}</h2>
       <p>{task.description}</p>
-      <h3>Travel request</h3>
+      <h3>{t("Travel request")}</h3>
       <p className="travel-query">{task.query}</p>
       <dl className="trip-details">
         {task.trip_details.map((detail) => (
@@ -71,33 +74,40 @@ export default function TravelTaskPanel({ task }: { task: TravelPlannerTask }) {
           </div>
         ))}
       </dl>
-      <h3>Travel data</h3>
+      <h3>{t("Travel data")}</h3>
       <p>{task.reference_notice}</p>
       <p className="table-help">
-        Open a section to view its options. Tables scroll horizontally.
+        {t("Open a section to view its options. Tables scroll horizontally.")}
       </p>
-      <div className="travel-references" aria-label="Provided travel data">
+      <div className="travel-references" aria-label={t("Provided travel data")}>
         {Object.entries(task.reference_information).map(([title, data]) => (
           <ReferenceSection key={title} title={title} data={data} />
         ))}
       </div>
-      <h3>Final itinerary</h3>
+      <h3>{t("Final itinerary")}</h3>
       <p>{task.final_instruction}</p>
       <details className="source">
-        <summary>Task source and adaptation</summary>
+        <summary>{t("Task source and adaptation")}</summary>
         <p>
-          TravelPlanner · {task.source.split} · row {task.source.row_index}{" "}
-          (zero-based). The original request and all supplied travel options are
-          retained. No reference itinerary is included.
+          {t("TravelPlanner · ")}
+          {task.source.split}
+          {t(" · row ")}
+          {task.source.row_index}{" "}
+          {t(
+            "(zero-based). The original request and all supplied travel options are retained. No reference itinerary is included.",
+          )}
         </p>
         <p>
-          This task uses the official sole-planning data in a human–AI chat
-          study. It does not run the original tool environment or automatic
-          benchmark evaluation.
+          {t(
+            "This task uses the official sole-planning data in a human–AI chat study. It does not run the original tool environment or automatic benchmark evaluation.",
+          )}
         </p>
         <p>{task.source.attribution}</p>
         <p>
-          Dataset: {task.source.dataset}. License: {task.source.license}.
+          {t("Dataset: ")}
+          {task.source.dataset}
+          {t(". License: ")}
+          {task.source.license}.
         </p>
       </details>
     </aside>

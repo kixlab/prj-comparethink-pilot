@@ -27,7 +27,15 @@ npm run preview      # http://localhost:4173, API 미들웨어 포함
 
 ## 참가자 진행
 
-화면은 영어로 표시됩니다. **Session setup → Task**에서 과제를 선택하고 마이크를 확인합니다. 과제 수행 화면은 과제와 채팅 패널로 나뉩니다. 앱 버전은 `0.4.0`, Blocksworld 과제 표현 버전은 `1.2.0`, TravelPlanner 과제 버전은 `1.0.0`입니다.
+상단 **Language / 언어**에서 **English / 한국어**를 선택할 수 있습니다. 선택은 이 브라우저에 유지되며 `?lang=en` / `?lang=ko` 링크로도 지정할 수 있습니다. **Session setup → Task / 세션 준비 → 과제**에서 과제를 선택하고 마이크를 확인합니다. 과제 수행 화면은 과제와 채팅 패널로 나뉩니다. 앱 버전은 `0.4.0`, Blocksworld 과제 표현 버전은 `1.2.0`, TravelPlanner 과제 버전은 `1.0.0`입니다.
+
+언어는 안내 화면에 진입하기 전 선택하며, 안내·과제 수행 중에는 변경하지 못합니다. 한국어 버전은 준비·안내·과제 설명·채팅 UI·종료 리뷰·음성 구간·전사 UI를 번역합니다. 사용자 메시지, 모델 응답, 전사 결과와 원본 오류 기록은 자동 번역하지 않습니다. 서버가 선택한 언어의 과제 설정을 제공하고 config ID에 고정하므로 참가자와 AI에는 같은 과제 내용이 제공됩니다. `session.json`의 `ui_language`, `config.task.language`, 실제 안내문, `task.json`의 번역문·원문·출처 변경 사항으로 제시 언어를 확인할 수 있습니다. 화면 언어와 STT 인식 언어는 별개이며 STT 언어는 서버의 `STT_LANGUAGE` 설정을 따릅니다.
+
+### 관리자와 저장된 세션
+
+초기 화면의 **Participant ID / 참가자 ID**에 `admin`을 입력하고 Enter 또는 **Open admin / 관리 화면 열기**를 누르면 관리 화면으로 진입합니다. 여기서만 **Saved sessions / 저장된 세션** 목록, **Review recording / 기록 검토**, **Download ZIP again / ZIP 다시 받기**를 제공합니다. 일반 준비·안내·진행·종료 화면에는 이전 세션 목록을 표시하거나 불러오지 않습니다. 종료 화면에서는 방금 수행한 현재 세션의 리뷰와 다운로드를 사용할 수 있습니다.
+
+**Back to participant setup / 참가자 준비 화면으로 돌아가기**는 목록과 리뷰를 닫고 새 익명 참가자 ID로 돌아갑니다. 새로고침 후 관리 화면을 보려면 다시 `admin`을 입력해야 합니다. 관리 화면은 현재 origin/브라우저 프로필의 IndexedDB 자료를 보는 로컬 UI 진입 구분이며 비밀번호 기반 서버 인증은 아닙니다. 기존 자료는 삭제하거나 이동하지 않습니다.
 
 1. 과제 선택 → 익명 참가자 ID 확인 → 마이크 테스트 녹음 → 재생하여 본인 목소리 확인.
 2. 선택한 과제의 안내와 think-aloud·수집 안내 확인. Blocksworld는 초기/목표 상태와 행동 규칙, TravelPlanner는 여행 요청과 제공된 여행 자료를 확인합니다.
@@ -54,7 +62,7 @@ npm run preview      # http://localhost:4173, API 미들웨어 포함
 - 원본 파일 커밋: `9bd247838ec314f048f6a37a147201e74d64572d`.
 - 선택: **instance_id 2**. 이 항목 안의 **example_instance_ids [1]**은 별개의 예제입니다.
 - 원본 query에서 행동 규칙과 **마지막 `[STATEMENT]`의 대상 문제만** 추출합니다. 앞선 예제 상태·예제 풀이 및 `ground_truth_plan` 필드는 포함하지 않습니다. 원본 전체 파일은 런타임/번들/저장소에 넣지 않습니다.
-- 참가자 화면과 과제는 영어로 제공합니다. 원본 규칙·초기 상태·목표를 항목별로 정리하고 행동 이름과 제출 안내를 덧붙였습니다. 블록/규칙/목표는 유지합니다. 원문 발췌, 파일 SHA-256, 커밋, 변경 목록은 `task.json`에 남습니다.
+- 참가자 화면과 과제는 영어 또는 한국어로 제공합니다. 원본 규칙·초기 상태·목표를 항목별로 정리하고 행동 이름과 제출 안내를 덧붙였습니다. 블록/규칙/목표와 행동 식별자(`pick-up` 등)는 유지합니다. 한국어 번역 v1 적용 사실, 영어 원문 발췌, 파일 SHA-256, 커밋, 변경 목록은 `task.json`에 남습니다.
 
 Blocksworld 데이터는 [`tasks/blocksworld-instance-2.json`](tasks/blocksworld-instance-2.json)에 있으며 블록 그림은 `initial_stacks`로 렌더링합니다. 문제를 바꾸면 규칙·문구·그림이 일치하는지 확인하세요.
 
@@ -166,7 +174,7 @@ STT_WHISPER_BIN=
 STT_FFMPEG_BIN=/usr/local/bin/ffmpeg
 ```
 
-서버를 재시작한 뒤 Complete 또는 Saved sessions → Review recording에서 **Generate transcript**를 누릅니다. 한국어를 명시하려면 `STT_LANGUAGE=ko`, 영어는 `en`, 녹음별 자동 감지는 `auto`입니다. 전사는 번역하지 않으며 협업 AI에 전사 내용이나 음성을 보내지 않습니다. 첫 실행은 모델 로드/컴파일 때문에 더 오래 걸릴 수 있습니다.
+서버를 재시작한 뒤 Complete 또는 관리 화면의 Saved sessions → Review recording에서 **Generate transcript**를 누릅니다. 한국어 UI에서는 **전사문 생성**입니다. 한국어 인식을 명시하려면 `STT_LANGUAGE=ko`, 영어는 `en`, 녹음별 자동 감지는 `auto`입니다. 전사는 번역하지 않으며 협업 AI에 전사 내용이나 음성을 보내지 않습니다. 첫 실행은 모델 로드/컴파일 때문에 더 오래 걸릴 수 있습니다.
 
 ### 실험용 API로 전환
 
@@ -319,6 +327,7 @@ session.json          # 익명 ID, 설정, 과제·모델·앱 버전, 안내 �
 ## 코드 구조와 검증
 
 - `src/pilot/App.tsx`, `style.css`: 마이크 테스트, 안내, 과제, 채팅, 제출, 재다운로드.
+- `src/pilot/i18n.tsx`, `translations.ts`: 화면 언어 선택·보존과 한국어 UI 문구. `tasks/localization.ts`: 과제 번역과 출처 변경 기록. TravelPlanner 표의 항목명은 번역하고 고유명사·가격·시간·규칙 등 원자료 값은 그대로 유지합니다.
 - `src/pilot/SessionReview.tsx`: 종료/저장 세션의 대화 원문, 실제 녹음 파형, 공통 타임라인, 재생 위치와 대화 연동.
 - `src/pilot/reviewWindows.ts`, `AudioWindowControls.tsx`: 이벤트에서 가상 음성 구간·원본 파일 위치를 계산하고 Exchange별 재생 버튼을 표시합니다. 기준/맥락 범위, 실패·미완료·녹음 누락 정책은 이곳에서 변경합니다.
 - `src/pilot/engine.ts`: 세션 시계, 전송/AI/음성 생명주기와 원본 이벤트.

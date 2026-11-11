@@ -135,3 +135,15 @@ Blocksworld와 공식 TravelPlanner validation row 0을 시작 전 선택할 수
 - Chrome에서 선택한 구간 끝 자동 정지(기준 재생 끝과 차이 150ms 미만), 맥락 선택, 정규/재생 범위 표시, 새로고침 후 동일 구간 내보내기, 실패 시 표시 구간 비활성화, 녹음 중단 후 Part 1 끝 정지 및 Part 2 명시적 선택을 확인했습니다. 데스크톱/390px 화면 이미지는 `test-results/audio-window-desktop.png`, `test-results/audio-window-mobile.png`입니다.
 - 전체 `npm run test:browser` 11개, `npm run build`, `npm run format:check`, `git diff --check`도 통과했습니다.
 - 자동 검사의 음성은 기존 합성 MediaStream을 실제 MediaRecorder로 수집한 것이며 채팅/STT 외부 응답은 fixture입니다. 이 변경에서 실제 모델/STT API 호출이나 전사 정확도 평가는 하지 않았습니다.
+
+## 관리자 화면 분리와 영어·한국어 선택 (2026-11-06)
+
+- 초기 Participant ID에 `admin`을 입력하고 Enter 또는 Open admin으로 관리 화면에 진입합니다. 세션 목록 읽기는 이 진입 뒤에만 수행합니다. 준비/안내/수행/종료 화면에서는 과거 세션 목록을 표시하거나 불러오지 않고, 종료 시 현재 세션의 리뷰와 ZIP 다운로드만 유지합니다.
+- 관리 화면에서 기존 세션 리뷰·재다운로드를 확인했습니다. 돌아가기와 새로고침 시 관리 화면은 해제되며, admin 자체로 세션을 생성하거나 마이크를 요청하지 않습니다. 데이터 삭제/이전/DB 마이그레이션은 없으며, 이는 로컬 UI 진입 구분으로 서버 비밀번호 인증은 아닙니다.
+- 상단 English/한국어 선택은 localStorage에 보존하며 `?lang=en|ko`가 우선합니다. `html.lang`을 갱신하고 안내/수집 중에는 선택을 잠급니다. Blocksworld와 TravelPlanner의 안내·과제 설명 및 준비/채팅/종료 리뷰·가상 음성 구간·전사 UI를 번역했습니다. 대화·전사 원문과 원본 진단은 자동 번역하지 않습니다.
+- 서버는 `/api/config?task_id=...&language=en|ko`로 정규 설정을 선택합니다. 같은 과제의 언어별 설정은 config ID가 다르고, 동일 세션에서 언어를 바꾸려는 요청은 409로 거부합니다. 선택한 언어의 과제 정보만 모델에 전달하며 think-aloud 음성·전사문은 계속 제외합니다.
+- `session.json.ui_language`, `config.task.language`, `session_created`의 ui_language와 실제 안내문을 기록합니다. 한국어 `task.json`에는 번역문, 영어 원문 발췌, 번역 v1 출처 변경 기록을 보존합니다. 행동 ID/블록 배치/목표, 여행 데이터 9개 섹션의 값·장소명·날짜·가격은 유지합니다. STT 인식 언어는 별도 서버 설정을 따릅니다.
+- `npm test` 29개 통과. 추가 검사에서 두 과제의 원문·벤치마크 ID·행동 ID·원자료 값 보존, 영어 원본 불변성, 언어별 config fingerprint·모델 문맥·실제 안내문과 번역 fallback/placeholder를 확인했습니다.
+- Chrome에서 참가자 화면의 sessions store 목록 읽기 0회, admin 진입 이후 목록/다운로드/리뷰와 진입 해제, 한국어 마이크 확인→안내→한글 조합 입력→응답→명시적 최종 제출→구간 재생→ZIP→관리자 재진입을 확인했습니다. 한국어 TravelPlanner의 표 머리글·항공편 원자료, 참가자/AI 과제 문맥 일치 및 언어 변경 거부도 검사했습니다.
+- 브라우저 시나리오 13개를 모두 검증했습니다. 기존 영어 화면/TravelPlanner 정상 제출 검사는 언어 선택지와 응답 완료 대기를 반영해 해당 2개를 재실행했습니다. `npm run build`, `npm run format:check`, `git diff --check`도 통과했습니다.
+- 화면 이미지는 `test-results/admin-desktop.png`, `setup-korean-mobile.png`, `guide-korean-desktop.png`, `review-korean-desktop.png`, `travelplanner-korean-desktop.png`입니다. 자동 마이크는 합성 MediaStream/실제 MediaRecorder이며 외부 모델·STT는 fixture로, 이 변경에서 실제 유료 API 호출은 하지 않았습니다.
