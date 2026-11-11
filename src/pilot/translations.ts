@@ -57,6 +57,23 @@ const ko: Record<string, string> = {
   "Back to participant setup": "참가자 준비 화면으로 돌아가기",
   "No saved sessions on this browser.": "이 브라우저에 저장된 세션이 없습니다.",
   "Saved sessions": "저장된 세션",
+  "Server backup": "서버 백업",
+  "All data is saved on the server.": "모든 데이터가 서버에 저장되었습니다.",
+  "Server upload failed: {error}. Retrying automatically.":
+    "서버 업로드 실패: {error}. 자동으로 다시 시도합니다.",
+  "Uploading to the server… {count} items remaining":
+    "서버에 업로드 중… 남은 항목 {count}개",
+  "Uploading to the server…": "서버에 업로드 중…",
+  "Server sessions": "서버에 저장된 세션",
+  "Sessions uploaded to the server from every participant's browser.":
+    "모든 참가자 브라우저에서 서버로 업로드된 세션입니다.",
+  Refresh: "새로고침",
+  "No sessions on the server yet.": "서버에 저장된 세션이 아직 없습니다.",
+  "{events} events · {chunks} audio chunks":
+    "이벤트 {events}개 · 녹음 조각 {chunks}개",
+  "Download ZIP": "ZIP 받기",
+  "Server sessions are available only with the researcher's admin link.":
+    "서버에 저장된 세션은 연구자 관리자 링크로 접속해야 볼 수 있습니다.",
   "Saved sessions (": "저장된 세션 (",
   "You can download saved sessions again. Unfinished sessions are exported as incomplete.":
     "저장된 세션을 다시 내려받을 수 있습니다. 종료되지 않은 세션은 수집 미완료로 내보냅니다.",

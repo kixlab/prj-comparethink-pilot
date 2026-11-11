@@ -40,7 +40,11 @@ try {
     console.error(
       "→ Check the username and password in MONGODB_URI (Atlas: Database Access).",
     );
-  else if (/Server selection timed out|ECONNREFUSED|ETIMEDOUT/i.test(message))
+  else if (
+    /Server selection timed out|ECONNREFUSED|ETIMEDOUT|tlsv1 alert internal error|SSL alert number 80/i.test(
+      message,
+    )
+  )
     console.error(
       "→ This machine's IP is probably not allowed. Add it in Atlas: Network Access → IP Access List.",
     );

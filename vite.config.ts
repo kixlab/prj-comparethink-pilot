@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { pilotPlugin } from "./server/pilotPlugin";
 import { sttPlugin } from "./server/sttPlugin";
+import { syncPlugin } from "./server/syncPlugin";
 const version = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ).version;
@@ -29,6 +30,7 @@ export default defineConfig(({ mode }) => {
       react(),
       pilotPlugin(env, version, commit),
       sttPlugin(env, process.cwd()),
+      syncPlugin(env, process.cwd()),
     ],
     server: { host: "127.0.0.1", allowedHosts },
     // Deployment: PILOT_HOST/PILOT_PORT pick the address the reverse proxy forwards to.

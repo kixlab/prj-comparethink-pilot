@@ -97,6 +97,62 @@ export async function loadSnapshot(sessionId: string): Promise<Snapshot> {
   };
 }
 
+// Incremental reads for the server uploader. They only see records already persisted here.
+export async function getStoredSession(sessionId: string) {
+  const db = await openDatabase();
+  return result<Session | undefined>(
+    db.transaction("sessions").objectStore("sessions").get(sessionId),
+  );
+}
+const eventRange = (sessionId: string, after: number, through: number) =>
+  IDBKeyRange.bound([sessionId, after], [sessionId, through], true, false);
+export async function eventsAfter(
+  sessionId: string,
+  after: number,
+  limit: number,
+) {
+  const db = await openDatabase();
+  return result<RawEvent[]>(
+    db
+      .transaction("events")
+      .objectStore("events")
+      .getAll(eventRange(sessionId, after, Number.MAX_SAFE_INTEGER), limit),
+  );
+}
+export async function countEvents(
+  sessionId: string,
+  after = -1,
+  through = Number.MAX_SAFE_INTEGER,
+) {
+  const db = await openDatabase();
+  return result<number>(
+    db
+      .transaction("events")
+      .objectStore("events")
+      .count(eventRange(sessionId, after, through)),
+  );
+}
+export async function audioChunkIds(sessionId: string) {
+  const db = await openDatabase();
+  return (await result<IDBValidKey[]>(
+    db
+      .transaction("audio")
+      .objectStore("audio")
+      .index("session_id")
+      .getAllKeys(sessionId),
+  )) as string[];
+}
+export async function getAudioChunks(chunkIds: string[]) {
+  const db = await openDatabase();
+  const store = db.transaction("audio").objectStore("audio");
+  const chunks = await Promise.all(
+    chunkIds.map((chunkId) =>
+      result<AudioChunk | undefined>(store.get(chunkId)),
+    ),
+  );
+  return chunks.filter((c): c is AudioChunk => Boolean(c));
+}
+
 const transcriptionMemory = new Map<string, TranscriptionRecord>();
 const transcriptionPending = new Set<string>();
 const transcriptionReadErrors = new Map<string, string>();

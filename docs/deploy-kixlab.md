@@ -144,8 +144,29 @@ curl -s localhost:4173/api/stt/config | grep -o '"ready":[a-z]*'      # true
 3. 종료 후 전사 실행 → 구간 시각이 표시되는지
 4. ZIP 다운로드
 
-## 6. DB 연동 전 주의사항
+## 6. 서버 저장 (MongoDB Atlas + 디스크)
 
-- **데이터는 참가자 브라우저에만 남습니다.** 세션이 끝나면 참가자가 ZIP을 받아 연구자에게 전달해야 합니다. 진행자가 화면 공유로 다운로드 완료를 확인하세요.
+`MONGODB_URI`를 지정하면 브라우저가 세션을 서버로 자동 업로드합니다. 브라우저(IndexedDB) 저장은 그대로 유지되고, 서버 사본은 백업 겸 연구자 수집 경로입니다.
+
+| 데이터                             | 저장 위치                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------- |
+| 세션 메타데이터, 이벤트, 전사 기록 | Atlas `MONGODB_DB` (`sessions`, `events`, `transcriptions`, `audio_chunks` 컬렉션) |
+| 녹음 원본 조각                     | 서버 디스크 `PILOT_DATA_DIR/audio/<session_id>/<chunk_id>.bin`                     |
+
+```dotenv
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/
+MONGODB_DB=comparethink                 # 개발용 PC는 comparethink_dev 처럼 다른 이름
+PILOT_DATA_DIR=/ssd/jaeyoung/comparethink-data
+PILOT_ADMIN_TOKENS=<openssl rand -hex 16 결과>   # 연구자 전용
+```
+
+- 연결 확인: `npm run db:check`. "IP is probably not allowed"가 나오면 Atlas **Network Access**에 그 컴퓨터의 IP(`curl -s ifconfig.me`)를 추가합니다.
+- 업로드 시점: 세션 중 10초마다, 종료 직후, 그리고 페이지를 열 때 그 브라우저에 남은 이전 세션까지. 끊기면 다음 시도에서 이어서 올리고, 같은 기록을 두 번 저장하지 않습니다.
+- 종료 화면의 **서버 백업** 줄이 "모든 데이터가 서버에 저장되었습니다"가 될 때까지 참가자가 탭을 닫지 않게 안내하세요.
+- **연구자 조회**: `?key=<관리자 키>`로 접속 → 참가자 ID에 `admin` → **서버에 저장된 세션**에서 기록 검토와 ZIP 받기. 참가자 키로는 업로드만 되고 조회는 403으로 막힙니다.
+- **백업**: 무료 Atlas(M0)는 자동 백업이 없습니다. 실험 기간에는 주기적으로 관리 화면에서 ZIP을 받아 두거나 `PILOT_DATA_DIR` 폴더를 복사해 두세요.
+
+## 7. 주의사항
+
 - **외부에 열 때는 반드시 `PILOT_ACCESS_TOKENS`를 지정하세요.** 비워 두면 주소를 아는 누구나 서버 키로 모델을 호출할 수 있습니다. 키가 있어도 요청 횟수 제한은 없으니 파일럿 기간이 아닐 때는 `pm2 stop comparethink`으로 내려 두고, OpenAI 대시보드에서 사용량 한도도 설정해 두세요.
-- 관리 화면(`admin`)은 그 브라우저의 IndexedDB만 보여 주므로 서버 쪽 노출 위험은 없습니다.
+- `MONGODB_URI`를 비우면 서버 저장이 꺼지고 예전처럼 브라우저에만 남습니다. 이 경우 참가자가 ZIP을 받아 전달해야 합니다.
