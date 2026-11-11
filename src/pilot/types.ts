@@ -1,5 +1,6 @@
 import type { Task } from "../../tasks/types";
 import type { TranscriptionRecord } from "./transcriptionTypes";
+import { translate, type Language } from "./translations";
 export type { Task, TaskOption, TaskCatalog } from "../../tasks/types";
 export type MessageStatus =
   "sent" | "streaming" | "completed" | "interrupted" | "failed";
@@ -72,6 +73,7 @@ export interface Session {
   schema_version: "comparethink-session-v1";
   session_id: string;
   participant_id: string;
+  ui_language?: Language;
   config: Configuration;
   instructions: { task: string; think_aloud: string; audio_notice: string };
   collection_policy?: {
@@ -121,9 +123,12 @@ export const instructions = {
     "Microphone audio, sent chat messages, AI responses, and your submitted final plan are collected from task start until the session ends. Unsent text and edit history are not collected. Research audio and transcripts are not sent to the chat AI. After the task, recordings can be transcribed using the configured local or external transcription service. The microphone test recording is not included in the session data.",
 };
 export function instructionsForTask(task: Task) {
+  const language = task.language === "ko" ? "ko" : "en";
   return {
     ...instructions,
     task: task.participant_instruction ?? instructions.task,
+    think_aloud: translate(language, instructions.think_aloud),
+    audio_notice: translate(language, instructions.audio_notice),
   };
 }
 export const audioConstraints = {

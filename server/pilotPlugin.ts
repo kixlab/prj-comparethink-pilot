@@ -8,7 +8,9 @@ import {
   taskContext,
 } from "../tasks/registry";
 import type { Task } from "../tasks/types";
+import { localizeTask } from "../tasks/localization";
 import { readSse } from "../src/pilot/stream";
+import { ACCESS_ERROR, accessGuard } from "./access";
 import type { Configuration } from "../src/pilot/types";
 
 function connectionSettings(env: Record<string, string | undefined>) {
@@ -146,13 +148,16 @@ export function pilotPlugin(
   commit: string,
   upstream: typeof fetch = fetch,
 ): Plugin {
-  const configurations = tasks.map((task) =>
-    makeConfiguration(env, version, commit, task),
+  const configurations = tasks.flatMap((task) =>
+    (["en", "ko"] as const).map((language) =>
+      makeConfiguration(env, version, commit, localizeTask(task, language)),
+    ),
   );
   const configurationById = new Map(
     configurations.map((config) => [config.config_id, config]),
   );
   const sessionBindings = new Map<string, string>();
+  const hasAccess = accessGuard(env);
   function install(server: { middlewares: { use: (handler: any) => void } }) {
     server.middlewares.use(
       async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
@@ -169,6 +174,7 @@ export function pilotPlugin(
           return json(res, 403, {
             error: "Cross-origin requests are disabled",
           });
+        if (!hasAccess(req)) return json(res, 401, { error: ACCESS_ERROR });
         if (path === "/api/tasks")
           return req.method === "GET"
             ? json(res, 200, taskCatalog)
@@ -176,13 +182,16 @@ export function pilotPlugin(
         if (path === "/api/config") {
           if (req.method !== "GET")
             return json(res, 405, { error: "GET only" });
-          const taskId =
-            new URL(
-              req.url ?? "/api/config",
-              "http://localhost",
-            ).searchParams.get("task_id") ?? defaultTask.task_id;
+          const params = new URL(req.url ?? "/api/config", "http://localhost")
+            .searchParams;
+          const taskId = params.get("task_id") ?? defaultTask.task_id;
+          const language = params.get("language") ?? "en";
+          if (!["en", "ko"].includes(language))
+            return json(res, 400, { error: "Unknown language" });
           const selected = configurations.find(
-            (config) => config.task.task_id === taskId,
+            (config) =>
+              config.task.task_id === taskId &&
+              config.task.language === language,
           );
           return selected
             ? json(res, 200, selected)

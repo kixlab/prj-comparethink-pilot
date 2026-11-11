@@ -28,6 +28,329 @@ async function start(page: Page, task?: "travelplanner" | "blocksworld") {
   await page.getByRole("button", { name: "Start task", exact: true }).click();
   await expect(page.getByText("Recording", { exact: true })).toBeVisible();
 }
+async function enterAdmin(page: Page) {
+  await expect(
+    page.getByRole("heading", { name: "Saved sessions", exact: true }),
+  ).toHaveCount(0);
+  const participant = page.getByRole("textbox", {
+    name: "Participant ID",
+    exact: true,
+  });
+  await participant.fill("admin");
+  await participant.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Admin", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Saved sessions", exact: true }),
+  ).toBeVisible();
+}
+
+test("saved sessions are loaded only after entering admin and never appear in participant setup or completion", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as any).__sessionListReads = 0;
+    const getAll = IDBObjectStore.prototype.getAll;
+    IDBObjectStore.prototype.getAll = function (...args: any[]) {
+      if (this.name === "sessions") (window as any).__sessionListReads++;
+      return getAll.apply(this, args as any);
+    };
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Session setup", exact: true }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__sessionListReads)).toBe(0);
+  await enterAdmin(page);
+  await expect(
+    page.getByText("No saved sessions on this browser.", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as any).__testMicStream),
+  ).toBeUndefined();
+  await page
+    .getByRole("button", { name: "Back to participant setup", exact: true })
+    .click();
+  await start(page);
+  await page.waitForTimeout(1100);
+  await submit(page, "Admin visibility check");
+  await expect(page.locator(".saved-row")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Download ZIP again", exact: true }),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__sessionListReads)).toBe(0);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Saved sessions", exact: true }),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__sessionListReads)).toBe(0);
+  await enterAdmin(page);
+  await expect(page.locator(".saved-row")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Review recording", exact: true })
+    .click();
+  await expect(page.locator(".review-final")).toContainText(
+    "Admin visibility check",
+  );
+  expect(
+    text(await download(page, "Download ZIP again"), "final_answer.txt"),
+  ).toBe("Admin visibility check");
+  await page.screenshot({
+    path: "test-results/admin-desktop.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Back to participant setup", exact: true })
+    .click();
+  await expect(page.locator(".saved-row, .review")).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Admin", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("Korean selection translates the complete participant and review flow and fixes the presented language in exports", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  let transcriptions = 0;
+  page.on("request", (r) => {
+    if (r.url().includes("/api/stt/transcribe")) transcriptions++;
+  });
+  await page.goto("/");
+  await page
+    .getByRole("combobox", { name: "Language", exact: true })
+    .selectOption("ko");
+  await expect(
+    page.getByRole("heading", { name: "세션 준비", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ko");
+  await page.reload();
+  await expect(
+    page.getByRole("combobox", { name: "언어", exact: true }),
+  ).toHaveValue("ko");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/setup-korean-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page
+    .getByRole("button", { name: "마이크 테스트 시작", exact: true })
+    .click();
+  await expect(page.getByText("테스트 녹음 중", { exact: true })).toBeVisible();
+  await page.waitForTimeout(500);
+  await page
+    .getByRole("button", { name: "테스트 녹음 중지", exact: true })
+    .click();
+  await page
+    .getByLabel("녹음을 재생했고 제 목소리가 들리는 것을 확인했습니다.")
+    .check();
+  await page.getByRole("button", { name: "안내로 이동", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "행동 규칙", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("주황 블록이 빨강 블록 위에 있어야 합니다.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "언어", exact: true }),
+  ).toBeDisabled();
+  const shownInstructions = await page
+    .locator(".instruction-card p")
+    .allTextContents();
+  const audioNotice = await page.locator(".notice").innerText();
+  await page.screenshot({
+    path: "test-results/guide-korean-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "과제 시작", exact: true }).click();
+  await expect(page.getByText("녹음 중", { exact: true })).toBeVisible();
+  const input = page.getByRole("textbox", {
+    name: "AI에게 보낼 메시지",
+    exact: true,
+  });
+  await input.fill("규칙을 함께 확인해 주세요.");
+  await input.dispatchEvent("compositionstart");
+  await input.press("Enter");
+  await expect(page.locator(".message.user")).toHaveCount(0);
+  await input.dispatchEvent("compositionend");
+  const sentPrompt = await input.inputValue();
+  await input.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "전송", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "최종 계획 작성", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "최종 계획", exact: true })
+    .fill("참가자가 직접 작성한 최종 계획");
+  await page
+    .getByRole("button", { name: "최종 계획 제출 및 세션 종료", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "세션 종료", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "마이크 타임라인", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "전사문 생성", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "대화 1 응답 대기 음성 재생", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "선택한 음성 구간", exact: true }),
+  ).toContainText("이벤트 경계");
+  await page
+    .getByRole("button", { name: "구간 재생 중지", exact: true })
+    .click();
+  await page.screenshot({
+    path: "test-results/review-korean-desktop.png",
+    fullPage: true,
+  });
+  const files = await download(page, "세션 ZIP 내려받기");
+  const session = parsed(files, "session.json"),
+    task = parsed(files, "task.json");
+  expect(session.ui_language).toBe("ko");
+  expect(task.language).toBe("ko");
+  expect(session.instructions.task).toBe(shownInstructions[0]);
+  expect(session.instructions.think_aloud).toBe(shownInstructions[1]);
+  expect(session.instructions.audio_notice).toBe(audioNotice);
+  expect(text(files, "final_answer.txt")).toBe(
+    "참가자가 직접 작성한 최종 계획",
+  );
+  expect(text(files, "events.jsonl")).toContain('"ui_language":"ko"');
+  expect(parsed(files, "messages.json")[0].content).toBe(sentPrompt);
+  expect(parsed(files, "messages.json")[1].content).toBe(
+    "I have checked the task rules and current state.",
+  );
+  expect(transcriptions).toBe(0);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "저장된 세션", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("textbox", { name: "참가자 ID", exact: true })
+    .fill("admin");
+  await page
+    .getByRole("button", { name: "관리 화면 열기", exact: true })
+    .click();
+  await page.getByRole("button", { name: "기록 검토", exact: true }).click();
+  await expect(page.locator(".review-final")).toContainText(
+    "참가자가 직접 작성한 최종 계획",
+  );
+  expect(parsed(await download(page, "ZIP 다시 받기"), "task.json")).toEqual(
+    task,
+  );
+  await page
+    .getByRole("button", { name: "참가자 준비 화면으로 돌아가기", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "언어", exact: true })
+    .selectOption("en");
+  await expect(
+    page.getByRole("heading", { name: "Session setup", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("combobox", { name: "Language", exact: true }),
+  ).toHaveValue("en");
+  await page
+    .getByRole("combobox", { name: "Language", exact: true })
+    .selectOption("ko");
+  await page
+    .getByRole("combobox", { name: "과제", exact: true })
+    .selectOption({ label: "TravelPlanner 여행 일정 과제" });
+  await page
+    .getByRole("button", { name: "마이크 테스트 시작", exact: true })
+    .click();
+  await expect(page.getByText("테스트 녹음 중", { exact: true })).toBeVisible();
+  await page.waitForTimeout(500);
+  await page
+    .getByRole("button", { name: "테스트 녹음 중지", exact: true })
+    .click();
+  await page
+    .getByLabel("녹음을 재생했고 제 목소리가 들리는 것을 확인했습니다.")
+    .check();
+  await page.getByRole("button", { name: "안내로 이동", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "여행 요청", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".travel-references details")).toHaveCount(9);
+  const title = "2022-03-13 Washington → Myrtle Beach 항공편";
+  await page.locator("summary").filter({ hasText: title }).click();
+  const flight = page.getByRole("table", { name: title, exact: true });
+  await expect(
+    flight.getByRole("columnheader", { name: "항공편 번호", exact: true }),
+  ).toBeVisible();
+  await expect(flight.getByText("F3792603", { exact: true })).toBeVisible();
+  const koConfig = await (
+    await page.request.get(
+      "/api/config?task_id=travelplanner-validation-row-0&language=ko",
+    )
+  ).json();
+  const enConfig = await (
+    await page.request.get(
+      "/api/config?task_id=travelplanner-validation-row-0&language=en",
+    )
+  ).json();
+  expect(await page.locator(".travel-query").innerText()).toBe(
+    koConfig.task.query,
+  );
+  expect(koConfig.task.reference_information).toEqual(
+    enConfig.task.reference_information,
+  );
+  expect(koConfig.config_id).not.toBe(enConfig.config_id);
+  expect(
+    (await page.request.get("/api/config?language=invalid")).status(),
+  ).toBe(400);
+  const body = {
+    session_id: "language-binding-check",
+    request_id: "ko-request",
+    config_id: koConfig.config_id,
+    messages: [{ role: "user", content: "한국어 여행 자료 확인" }],
+  };
+  expect((await page.request.post("/api/chat", { data: body })).status()).toBe(
+    200,
+  );
+  expect(
+    (
+      await page.request.post("/api/chat", {
+        data: {
+          ...body,
+          request_id: "en-change",
+          config_id: enConfig.config_id,
+        },
+      })
+    ).status(),
+  ).toBe(409);
+  const requests = await (await page.request.get("/__test/requests")).json();
+  const request = requests.find(
+    (r: any) => r.input.at(-1).content === "한국어 여행 자료 확인",
+  );
+  const context = JSON.parse(request.instructions.split("\n\n").at(-1));
+  expect(context.query).toBe(koConfig.task.query);
+  expect(context.reference_information).toEqual(
+    koConfig.task.reference_information,
+  );
+  await page.screenshot({
+    path: "test-results/travelplanner-korean-desktop.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+});
 async function database(page: Page) {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -272,6 +595,7 @@ test("continuous browser audio covers typing, AI wait and response; event seeks 
     fullPage: true,
   });
   await page.reload();
+  await enterAdmin(page);
   const reexport = await download(page, "Download ZIP again");
   expect(parsed(reexport, "session.json").session_id).toBe(meta.session_id);
   expect(reexport[segment.file]).toEqual(files[segment.file]);
@@ -492,6 +816,7 @@ test("completed review connects multiple exchanges, waveform playback and timeli
     fullPage: true,
   });
   await page.reload();
+  await enterAdmin(page);
   await page
     .getByRole("button", { name: "Review recording", exact: true })
     .click();
@@ -624,6 +949,7 @@ test("post-task transcripts seek the source recording, survive retries, cancella
     panel.getByRole("button", { name: "Retry saving transcript", exact: true }),
   ).toHaveCount(0);
   await page.reload();
+  await enterAdmin(page);
   await page
     .getByRole("button", { name: "Review recording", exact: true })
     .click();
@@ -932,6 +1258,7 @@ test("closed tab recovery exports persisted unfinished capture as incomplete wit
   await page.waitForTimeout(1300);
   page.on("dialog", (dialog) => dialog.accept());
   await page.reload();
+  await enterAdmin(page);
   await expect(
     page.getByRole("heading", { name: "Saved sessions", exact: true }),
   ).toBeVisible();
@@ -984,7 +1311,8 @@ test("server rejects model changes and research audio fields; mobile layout has 
   await expect(
     page.getByRole("heading", { name: "Microphone check" }),
   ).toBeVisible();
-  expect(await page.locator("body").innerText()).not.toMatch(/[가-힣]/);
+  // Language names remain available in both languages; the participant content is English.
+  expect(await page.locator("main").innerText()).not.toMatch(/[가-힣]/);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -1054,6 +1382,10 @@ test("TravelPlanner selection supplies the same complete travel data to the part
       { exact: true },
     ),
   ).toBeVisible();
+  // Text can be visible before the terminal SSE event. This scenario submits after completion.
+  await expect(
+    page.getByRole("button", { name: "Send", exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     path: "test-results/travelplanner-desktop.png",
     fullPage: true,
@@ -1098,6 +1430,7 @@ test("TravelPlanner selection supplies the same complete travel data to the part
     /red block|ground_truth_plan|annotated_plan/,
   );
   await page.reload();
+  await enterAdmin(page);
   await expect(
     page
       .locator(".saved-row")

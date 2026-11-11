@@ -17,6 +17,7 @@ import type {
 import { Journal } from "./storage";
 import { messagesFromEvents } from "./export";
 import { readSse } from "./stream";
+import { apiFetch } from "./access";
 
 export class SessionEngine {
   readonly session: Session;
@@ -47,6 +48,7 @@ export class SessionEngine {
       schema_version: "comparethink-session-v1",
       session_id: id(),
       participant_id: participantId,
+      ui_language: config.task.language === "ko" ? "ko" : "en",
       config: structuredClone(config),
       instructions: instructionsForTask(config.task),
       collection_policy: {
@@ -90,6 +92,7 @@ export class SessionEngine {
       instructions: this.session.instructions,
       task_id: config.task.task_id,
       task_kind: config.task.kind,
+      ui_language: this.session.ui_language,
     });
   }
   now() {
@@ -408,7 +411,7 @@ export class SessionEngine {
         definition:
           "Client calls fetch to the app server; not model receipt or generation start.",
       });
-      const response = await fetch("/api/chat", {
+      const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal,

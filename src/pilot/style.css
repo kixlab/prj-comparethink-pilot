@@ -112,6 +112,34 @@ small {
   min-height: 58px;
   border-bottom: 1px solid var(--border);
 }
+.language-select {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: normal;
+}
+.language-select select {
+  width: auto;
+  min-width: 90px;
+  margin: 0;
+  padding: 5px 8px;
+}
+.admin-panel {
+  padding-top: 28px;
+}
+.admin-panel .saved-sessions {
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+  .topbar .header-note {
+    display: none;
+  }
+}
 .brand {
   font-size: 18px;
   font-weight: 600;
