@@ -21,6 +21,13 @@ import {
   transcriptionReadError,
 } from "./storage";
 import { buildArchive, downloadArchive, messagesFromEvents } from "./export";
+import {
+  SyncManager,
+  listServerSessions,
+  loadServerSnapshot,
+  type SyncState,
+} from "./sync";
+import type { ServerSessionSummary } from "./syncFormat";
 
 const blockLabels: Record<string, string> = {
   red: "Red",
@@ -146,6 +153,29 @@ function ChatMessage({
     </article>
   );
 }
+function ServerBackup({ state }: { state?: SyncState }) {
+  const { t } = useI18n();
+  const status = state?.status ?? "syncing";
+  const text =
+    status === "synced"
+      ? t("All data is saved on the server.")
+      : status === "error"
+        ? t("Server upload failed: {error}. Retrying automatically.", {
+            error: state?.error ?? "",
+          })
+        : state?.pending
+          ? t("Uploading to the server… {count} items remaining", {
+              count: state.pending,
+            })
+          : t("Uploading to the server…");
+  return (
+    <div className={`server-backup ${status}`} role="status">
+      <strong>{t("Server backup")}</strong>
+      <span>{text}</span>
+    </div>
+  );
+}
+const megabytes = (bytes: number) => `${(bytes / 1048576).toFixed(1)} MB`;
 export default function App() {
   const { language, setLanguage, t } = useI18n();
   const [admin, setAdmin] = useState(false);
@@ -166,6 +196,10 @@ export default function App() {
   const [working, setWorking] = useState(false);
   const [engine, setEngine] = useState<SessionEngine | null>(null);
   const [, rerender] = useState(0);
+  const [sync] = useState(() => new SyncManager(() => rerender((v) => v + 1)));
+  const [serverSessions, setServerSessions] = useState<
+    ServerSessionSummary[] | null
+  >(null);
   const [prompt, setPrompt] = useState("");
   const [finalAnswer, setFinalAnswer] = useState("");
   const [showFinal, setShowFinal] = useState(false);
@@ -228,6 +262,21 @@ export default function App() {
       if (recorder?.state === "recording") recorder.stop();
     };
   }, []);
+  useEffect(() => {
+    void sync.start();
+    return () => sync.stop();
+  }, [sync]);
+  useEffect(() => {
+    if (admin && sync.enabled) void refreshServerSessions();
+  }, [admin, sync.enabled]);
+  async function refreshServerSessions() {
+    try {
+      setServerSessions(await listServerSessions());
+    } catch (e) {
+      setServerSessions(null);
+      setError(errorText(e));
+    }
+  }
   useEffect(() => {
     if (!admin) return;
     let cancelled = false;
@@ -390,6 +439,7 @@ export default function App() {
         rerender((v) => v + 1),
       );
       setEngine(current);
+      sync.current = current.session.session_id;
       current.log("microphone_test_confirmed", {
         playback_confirmed: micConfirmed,
         preflight_errors: micErrors.current,
@@ -443,6 +493,7 @@ export default function App() {
       await engine.finish(answer);
       setPhase("done");
       setReview({ ...engine.snapshot });
+      void sync.sync(engine.session.session_id);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -450,7 +501,11 @@ export default function App() {
       setWorking(false);
     }
   }
-  async function exportSession(snapshot: Snapshot, current = false) {
+  async function exportSession(
+    snapshot: Snapshot,
+    current = false,
+    fromServer = false,
+  ) {
     setWorking(true);
     setError("");
     try {
@@ -459,19 +514,21 @@ export default function App() {
         await engine.journal.flush();
       }
       const exported = { ...snapshot };
-      try {
-        exported.transcriptions = await loadTranscriptions(
+      if (!fromServer)
+        try {
+          exported.transcriptions = await loadTranscriptions(
+            snapshot.session.session_id,
+          );
+          exported.transcription_read_error = transcriptionReadError(
+            snapshot.session.session_id,
+          );
+        } catch (e) {
+          exported.transcription_read_error = errorText(e);
+        }
+      if (!fromServer)
+        exported.unsaved_transcription_ids = unsavedTranscriptionIds(
           snapshot.session.session_id,
         );
-        exported.transcription_read_error = transcriptionReadError(
-          snapshot.session.session_id,
-        );
-      } catch (e) {
-        exported.transcription_read_error = errorText(e);
-      }
-      exported.unsaved_transcription_ids = unsavedTranscriptionIds(
-        snapshot.session.session_id,
-      );
       const data = await buildArchive(
         exported,
         current ? (engine?.journal.pending.length ?? 0) : 0,
@@ -1006,6 +1063,9 @@ export default function App() {
               <small key={i}>{issue}</small>
             ))}
           </div>
+          {sync.enabled && (
+            <ServerBackup state={sync.state(engine.session.session_id)} />
+          )}
           {engine.journal.blocked && (
             <button
               className="secondary"
@@ -1028,6 +1088,7 @@ export default function App() {
               onClick={() => {
                 setAdmin(false);
                 setSaved([]);
+                setServerSessions(null);
                 setReview(null);
                 setError("");
                 setParticipant(`p-${id().slice(0, 8)}`);
@@ -1036,6 +1097,92 @@ export default function App() {
               {t("Back to participant setup")}
             </button>
           </div>
+          {sync.enabled && (
+            <section
+              className="saved-sessions server-sessions"
+              aria-label={t("Server sessions")}
+            >
+              <div>
+                <h2>{t("Server sessions")}</h2>
+                <p>
+                  {t(
+                    "Sessions uploaded to the server from every participant's browser.",
+                  )}
+                </p>
+                <button
+                  className="secondary compact"
+                  disabled={working}
+                  onClick={() => void refreshServerSessions()}
+                >
+                  {t("Refresh")}
+                </button>
+              </div>
+              {serverSessions && !serverSessions.length && (
+                <p>{t("No sessions on the server yet.")}</p>
+              )}
+              {serverSessions?.map((s) => (
+                <div className="saved-row" key={s.session_id}>
+                  <div>
+                    <strong>{s.participant_id}</strong>
+                    <small>{t(s.task_title)}</small>
+                    <small>
+                      {s.ui_language === "ko" || s.task_language === "ko"
+                        ? "한국어"
+                        : "English"}
+                    </small>
+                    <small>
+                      {new Date(s.origin_utc).toLocaleString(
+                        language === "ko" ? "ko-KR" : "en-GB",
+                      )}{" "}
+                      · {s.session_id.slice(0, 8)} ·{" "}
+                      {s.status === "active" || s.status === "interrupted"
+                        ? t("Interrupted or unfinished")
+                        : s.collection_status === "complete"
+                          ? t("Completed")
+                          : t("Incomplete collection")}
+                    </small>
+                    <small>
+                      {t("{events} events · {chunks} audio chunks", {
+                        events: s.event_count,
+                        chunks: s.audio_chunk_count,
+                      })}{" "}
+                      · {megabytes(s.audio_bytes)}
+                    </small>
+                  </div>
+                  <button
+                    className="secondary compact"
+                    disabled={working}
+                    onClick={() => {
+                      setWorking(true);
+                      void loadServerSnapshot(s.session_id)
+                        .then((snapshot) =>
+                          exportSession(snapshot, false, true),
+                        )
+                        .catch((e) => {
+                          setError(errorText(e));
+                          setWorking(false);
+                        });
+                    }}
+                  >
+                    {t("Download ZIP")}
+                  </button>
+                  <button
+                    className="text-button"
+                    disabled={working}
+                    onClick={() => {
+                      setWorking(true);
+                      void loadServerSnapshot(s.session_id)
+                        .then(setReview)
+                        .catch((e) => setError(errorText(e)))
+                        .finally(() => setWorking(false));
+                    }}
+                  >
+                    {t("Review recording")}
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
           <section className="saved-sessions" aria-label={t("Saved sessions")}>
             <div>
               <h2>{t("Saved sessions")}</h2>

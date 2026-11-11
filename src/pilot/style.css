@@ -1521,3 +1521,26 @@ audio {
   color: var(--muted);
   margin-bottom: 0;
 }
+.server-backup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  border: 1px solid #c9d3c4;
+  background: #f6faf4;
+  padding: 10px 14px;
+  margin: 12px 0;
+}
+.server-backup.syncing,
+.server-backup.pending {
+  border-color: #c3b380;
+  background: #fffcf2;
+}
+.server-backup.error {
+  border-color: #c7a0a0;
+  background: #fff6f6;
+  color: #6f1c1c;
+}
+.admin-panel .server-sessions {
+  margin-top: 20px;
+}
