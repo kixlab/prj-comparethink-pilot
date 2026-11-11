@@ -31,6 +31,12 @@ export default defineConfig(({ mode }) => {
       sttPlugin(env, process.cwd()),
     ],
     server: { host: "127.0.0.1", allowedHosts },
-    preview: { host: "127.0.0.1", allowedHosts },
+    // Deployment: PILOT_HOST/PILOT_PORT pick the address the reverse proxy forwards to.
+    preview: {
+      host: env.PILOT_HOST || "127.0.0.1",
+      port: Number(env.PILOT_PORT) || 4173,
+      strictPort: true,
+      allowedHosts,
+    },
   };
 });
