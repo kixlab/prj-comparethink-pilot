@@ -1,4 +1,5 @@
 import { useI18n } from "./i18n";
+import { apiFetch } from "./access";
 import { useEffect, useRef, useState } from "react";
 import type { Snapshot } from "./types";
 import { errorText, id } from "./types";
@@ -69,7 +70,7 @@ export default function TranscriptionPanel({
   const listEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const abort = new AbortController();
-    void fetch("/api/stt/config", { signal: abort.signal })
+    void apiFetch("/api/stt/config", { signal: abort.signal })
       .then(async (response) => {
         if (!response.ok)
           throw new Error("Could not load transcription configuration");
@@ -214,7 +215,7 @@ export default function TranscriptionPanel({
             sha256,
             config_id: configuration.config_id,
           });
-          const response = await fetch(`/api/stt/transcribe?${query}`, {
+          const response = await apiFetch(`/api/stt/transcribe?${query}`, {
             method: "POST",
             headers: {
               "Content-Type": segment.mime_type || "application/octet-stream",

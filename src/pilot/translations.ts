@@ -312,6 +312,8 @@ const ko: Record<string, string> = {
   "Dataset: ": "데이터셋: ",
   ". License: ": ". 라이선스: ",
   "Could not load the available tasks.": "과제 목록을 불러오지 못했습니다.",
+  "This access link is missing or invalid. Please open the link provided by the researcher.":
+    "접속 링크가 없거나 올바르지 않습니다. 연구자가 보낸 링크로 다시 접속해 주세요.",
   "Unknown task in the URL. Select a task below.":
     "URL의 과제를 찾을 수 없습니다. 아래에서 과제를 선택하세요.",
   "Could not load the selected task.": "선택한 과제를 불러오지 못했습니다.",

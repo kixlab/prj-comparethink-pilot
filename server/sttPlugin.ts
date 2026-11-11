@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
+import { ACCESS_ERROR, accessGuard } from "./access";
 import type {
   SttConfiguration,
   TranscriptCue,
@@ -463,6 +464,7 @@ export function sttPlugin(
   dependencies: SttDependencies = {},
 ): Plugin {
   const settings = makeSttSettings(env, root);
+  const hasAccess = accessGuard(env);
   let busy = false;
   const transcribe =
     dependencies.transcribe ||
@@ -484,6 +486,7 @@ export function sttPlugin(
           return json(res, 403, {
             error: "Cross-origin requests are disabled",
           });
+        if (!hasAccess(req)) return json(res, 401, { error: ACCESS_ERROR });
         if (url.pathname === "/api/stt/config")
           return req.method === "GET"
             ? json(res, 200, settings.configuration)

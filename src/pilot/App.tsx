@@ -11,6 +11,7 @@ import TravelTaskPanel from "./TravelTaskPanel";
 import { SessionEngine } from "./engine";
 import SessionReview from "./SessionReview";
 import { useI18n } from "./i18n";
+import { ACCESS_LINK_ERROR, apiFetch } from "./access";
 import {
   listSessions,
   loadSnapshot,
@@ -193,8 +194,9 @@ export default function App() {
   }
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/tasks")
+    void apiFetch("/api/tasks")
       .then(async (r) => {
+        if (r.status === 401) throw new Error(ACCESS_LINK_ERROR);
         if (!r.ok) throw new Error("Could not load the available tasks.");
         return r.json() as Promise<TaskCatalog>;
       })
@@ -245,13 +247,14 @@ export default function App() {
     if (!selectedTaskId) return;
     const controller = new AbortController();
     setConfig(null);
-    void fetch(
+    void apiFetch(
       `/api/config?task_id=${encodeURIComponent(selectedTaskId)}&language=${language}`,
       {
         signal: controller.signal,
       },
     )
       .then(async (r) => {
+        if (r.status === 401) throw new Error(ACCESS_LINK_ERROR);
         if (!r.ok) throw new Error("Could not load the selected task.");
         return r.json() as Promise<Configuration>;
       })

@@ -116,6 +116,7 @@ python3 scripts/importTravelPlanner.py /tmp/travelplanner-validation.csv /tmp/tr
 | `OPENAI_TEMPERATURE`       | 미지정                      | 선택 모델에서 지원할 때만 지정                              |
 | `OPENAI_REASONING_EFFORT`  | 미지정                      | 선택 모델에서 지원할 때만 지정                              |
 | `PILOT_PUBLIC_ORIGIN`      | 없음                        | HTTPS 역방향 프록시에서 사용하는 정확한 외부 origin         |
+| `PILOT_ACCESS_TOKENS`      | 없음(API 공개)              | 접속 키 목록. 지정하면 `/api/*`에 `?key=` 링크의 키 필요    |
 
 설정 변경 뒤 서버를 재시작하세요. 공급자, API base URL, 프로젝트, 모델명, 생성 설정, 시스템 프롬프트 전문, 과제 및 앱 버전을 세션에 복사합니다. 과제별로 이 내용의 SHA-256 `config_id`를 만들고 각 요청에서 확인하므로 서버 설정이 바뀐 진행 중 세션은 HTTP 409로 실패하며 조용히 다른 모델로 전환되지 않습니다. 앱 버전은 package version과 Git commit을 기록합니다. 미커밋 소스는 `-dirty`로 표시합니다.
 

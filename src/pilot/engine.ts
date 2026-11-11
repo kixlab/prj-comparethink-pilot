@@ -17,6 +17,7 @@ import type {
 import { Journal } from "./storage";
 import { messagesFromEvents } from "./export";
 import { readSse } from "./stream";
+import { apiFetch } from "./access";
 
 export class SessionEngine {
   readonly session: Session;
@@ -410,7 +411,7 @@ export class SessionEngine {
         definition:
           "Client calls fetch to the app server; not model receipt or generation start.",
       });
-      const response = await fetch("/api/chat", {
+      const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal,

@@ -10,6 +10,7 @@ import {
 import type { Task } from "../tasks/types";
 import { localizeTask } from "../tasks/localization";
 import { readSse } from "../src/pilot/stream";
+import { ACCESS_ERROR, accessGuard } from "./access";
 import type { Configuration } from "../src/pilot/types";
 
 function connectionSettings(env: Record<string, string | undefined>) {
@@ -156,6 +157,7 @@ export function pilotPlugin(
     configurations.map((config) => [config.config_id, config]),
   );
   const sessionBindings = new Map<string, string>();
+  const hasAccess = accessGuard(env);
   function install(server: { middlewares: { use: (handler: any) => void } }) {
     server.middlewares.use(
       async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
@@ -172,6 +174,7 @@ export function pilotPlugin(
           return json(res, 403, {
             error: "Cross-origin requests are disabled",
           });
+        if (!hasAccess(req)) return json(res, 401, { error: ACCESS_ERROR });
         if (path === "/api/tasks")
           return req.method === "GET"
             ? json(res, 200, taskCatalog)
