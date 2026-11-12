@@ -121,6 +121,7 @@ python3 scripts/importTravelPlanner.py /tmp/travelplanner-validation.csv /tmp/tr
 | `MONGODB_URI`              | 없음(서버 저장 끔)          | 지정하면 세션을 Atlas + 디스크로 자동 업로드                |
 | `MONGODB_DB`               | `comparethink`              | 저장할 데이터베이스 이름                                    |
 | `PILOT_DATA_DIR`           | `data`                      | 녹음 파일 저장 폴더                                         |
+| `STT_AUTO_TRANSCRIBE`      | `on`                        | 업로드가 끝난 세션을 서버가 자동 전사 (`off`로 끄기)        |
 
 설정 변경 뒤 서버를 재시작하세요. 공급자, API base URL, 프로젝트, 모델명, 생성 설정, 시스템 프롬프트 전문, 과제 및 앱 버전을 세션에 복사합니다. 과제별로 이 내용의 SHA-256 `config_id`를 만들고 각 요청에서 확인하므로 서버 설정이 바뀐 진행 중 세션은 HTTP 409로 실패하며 조용히 다른 모델로 전환되지 않습니다. 앱 버전은 package version과 Git commit을 기록합니다. 미커밋 소스는 `-dirty`로 표시합니다.
 

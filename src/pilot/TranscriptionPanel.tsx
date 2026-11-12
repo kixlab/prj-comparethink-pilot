@@ -45,17 +45,31 @@ function validResult(value: any): value is TranscriptionResult {
   );
 }
 
+/** Records from the snapshot (e.g. the server copy) plus those stored in this browser. */
+function mergeRecords(...lists: TranscriptionRecord[][]) {
+  const byId = new Map<string, TranscriptionRecord>();
+  for (const list of lists) for (const r of list) byId.set(r.entry_id, r);
+  return [...byId.values()].sort((a, b) =>
+    a.created_at_utc.localeCompare(b.created_at_utc),
+  );
+}
+
 export default function TranscriptionPanel({
   snapshot,
   playhead,
   onSeek,
+  serverTranscribes = false,
 }: {
   snapshot: Snapshot;
   playhead: number;
   onSeek: (t: number) => void;
+  /** The server transcribes this session after upload, so the browser does not offer to. */
+  serverTranscribes?: boolean;
 }) {
   const { t } = useI18n();
   const sessionId = snapshot.session.session_id;
+  const serverCopy = snapshot.source === "server";
+  const manual = serverCopy || !serverTranscribes;
   const [configuration, setConfiguration] = useState<SttConfiguration | null>(
     null,
   );
@@ -81,7 +95,7 @@ export default function TranscriptionPanel({
       });
     void loadTranscriptions(sessionId)
       .then((records) => {
-        setEntries(records);
+        setEntries(mergeRecords(snapshot.transcriptions ?? [], records));
         const readError = transcriptionReadError(sessionId);
         if (readError) setStorageError(readError);
       })
@@ -138,6 +152,19 @@ export default function TranscriptionPanel({
     ]);
     try {
       await saveTranscription(entry);
+      // A server copy is not a session of this browser, so upload its records directly.
+      if (serverCopy) {
+        const response = await apiFetch("/api/sync/transcriptions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, records: [entry] }),
+        });
+        if (!response.ok)
+          throw new Error(
+            (await response.json().catch(() => null))?.error ||
+              `Could not save the transcript on the server (HTTP ${response.status})`,
+          );
+      }
       return true;
     } catch (e) {
       setStorageError(errorText(e));
@@ -286,7 +313,7 @@ export default function TranscriptionPanel({
     >
       <div className="transcription-heading">
         <h3>{t("Think-aloud transcript")}</h3>
-        {busy ? (
+        {!manual ? null : busy ? (
           <button
             className="secondary compact"
             onClick={() => controller.current?.abort()}
@@ -326,7 +353,14 @@ export default function TranscriptionPanel({
           )}
         </p>
       )}
-      {configuration?.ready && (
+      {!manual && (
+        <p className="transcription-help">
+          {t(
+            "The recording is transcribed automatically on the server after it is uploaded. Audio and transcripts are never included in the chat AI request.",
+          )}
+        </p>
+      )}
+      {manual && configuration?.ready && (
         <p className="transcription-help">
           {configuration.remote_audio
             ? t(
@@ -351,7 +385,7 @@ export default function TranscriptionPanel({
           {t(error)}
         </p>
       )}
-      {unfinished && (
+      {manual && unfinished && (
         <p className="transcription-error">
           {t(
             "A previous attempt ended without a result. Generate again to retry.",

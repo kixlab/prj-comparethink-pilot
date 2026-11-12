@@ -26,7 +26,13 @@ const terminalLabels: Record<Message["status"], string> = {
   failed: "Failed",
 };
 
-export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
+export default function SessionReview({
+  snapshot,
+  serverTranscribes = false,
+}: {
+  snapshot: Snapshot;
+  serverTranscribes?: boolean;
+}) {
   const { t } = useI18n();
   const { session, audio } = snapshot;
   const messages = useMemo(
@@ -1132,6 +1138,7 @@ export default function SessionReview({ snapshot }: { snapshot: Snapshot }) {
             snapshot={snapshot}
             playhead={playhead}
             onSeek={(t) => seekTime(t, true)}
+            serverTranscribes={serverTranscribes}
           />
           {selected && (
             <section

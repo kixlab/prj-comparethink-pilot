@@ -163,7 +163,9 @@ PILOT_ADMIN_TOKENS=<openssl rand -hex 16 결과>   # 연구자 전용
 - 연결 확인: `npm run db:check`. "IP is probably not allowed"가 나오면 Atlas **Network Access**에 그 컴퓨터의 IP(`curl -s ifconfig.me`)를 추가합니다.
 - 업로드 시점: 세션 중 10초마다, 종료 직후, 그리고 페이지를 열 때 그 브라우저에 남은 이전 세션까지. 끊기면 다음 시도에서 이어서 올리고, 같은 기록을 두 번 저장하지 않습니다.
 - 종료 화면의 **서버 백업** 줄이 "모든 데이터가 서버에 저장되었습니다"가 될 때까지 참가자가 탭을 닫지 않게 안내하세요.
+- **자동 전사**: STT가 설정되어 있으면(`/api/stt/config`의 `ready: true`) 서버가 업로드가 끝난 세션의 녹음을 직접 Whisper로 전사해 `transcriptions` 컬렉션에 저장합니다(`generated_by: "server"`). 참가자 화면에는 전사 버튼 대신 안내 문구가 나옵니다. 서버 재시작 직후와 10분마다 밀린 세션을 다시 확인하고, 실패한 녹음은 최대 3번까지 다시 시도합니다. 진행 중으로 남은 채 1시간 넘게 업로드가 없는 세션도 전사합니다. 진행 로그는 `pm2 logs comparethink`의 `[auto-stt]` 줄에서 볼 수 있습니다. 끄려면 `STT_AUTO_TRANSCRIBE=off`로 설정하세요.
 - **연구자 조회**: `?key=<관리자 키>`로 접속 → 참가자 ID에 `admin` → **서버에 저장된 세션**에서 기록 검토와 ZIP 받기. 참가자 키로는 업로드만 되고 조회는 403으로 막힙니다.
+- **자동 전사**: STT가 설정되어 있으면(`/api/stt/config`의 `ready`가 true) 서버가 세션 업로드가 끝나는 대로 디스크의 녹음을 이어 붙여 직접 전사하고 결과를 `transcriptions` 컬렉션에 저장합니다(`generated_by: "server"`). 참가자는 버튼을 누를 필요가 없고, 종료 화면에도 전사 버튼 대신 안내 문구가 나옵니다. 실패하면 10분마다 다시 확인해 구간당 최대 3번까지 재시도하고, 서버를 재시작해도 밀린 세션을 이어서 처리합니다. 탭이 닫혀 `active`로 남은 세션은 마지막 업로드 1시간 뒤에 받은 만큼 전사합니다. 진행 상황은 `pm2 logs comparethink`의 `[auto-stt]` 줄로 볼 수 있습니다. 끄려면 `STT_AUTO_TRANSCRIBE=off`.
 - **백업**: 무료 Atlas(M0)는 자동 백업이 없습니다. 실험 기간에는 주기적으로 관리 화면에서 ZIP을 받아 두거나 `PILOT_DATA_DIR` 폴더를 복사해 두세요.
 
 ## 7. 주의사항
