@@ -44,6 +44,8 @@ export interface TranscriptionRecord {
   segment_id: string;
   created_at_utc: string;
   status: "started" | "completed" | "partial" | "failed" | "interrupted";
+  /** "server": transcribed automatically from the server copy. Absent: run in the browser. */
+  generated_by?: "server";
   configuration: SttConfiguration;
   source: {
     started_t_ms: number;

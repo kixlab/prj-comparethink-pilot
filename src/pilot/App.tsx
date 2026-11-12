@@ -1075,7 +1075,11 @@ export default function App() {
             </button>
           )}
           {review && (
-            <SessionReview key={review.session.session_id} snapshot={review} />
+            <SessionReview
+              key={review.session.session_id}
+              snapshot={review}
+              serverTranscribes={sync.autoTranscribe}
+            />
           )}
         </main>
       )}

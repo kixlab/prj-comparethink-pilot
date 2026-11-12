@@ -114,6 +114,8 @@ export interface Snapshot {
   transcriptions?: TranscriptionRecord[];
   unsaved_transcription_ids?: string[];
   transcription_read_error?: string;
+  /** "server": rebuilt from the server copy in the admin view. */
+  source?: "server";
 }
 export const instructions = {
   task: "Read the action rules, initial state, and goal. You may chat with the AI freely while working on the action sequence. Submit your final plan yourself when you are finished.",

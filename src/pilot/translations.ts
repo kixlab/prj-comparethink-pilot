@@ -294,6 +294,8 @@ const ko: Record<string, string> = {
     "음성과 전사문은 대화 AI 요청에 포함되지 않습니다.",
   "Generate transcribes the recording on the app server without an external STT API.":
     "외부 STT API 없이 앱 서버에서 녹음을 전사합니다.",
+  "The recording is transcribed automatically on the server after it is uploaded. Audio and transcripts are never included in the chat AI request.":
+    "녹음은 서버에 업로드된 뒤 서버에서 자동으로 전사됩니다. 음성과 전사문은 대화 AI 요청에 포함되지 않습니다.",
   "A previous attempt ended without a result. Generate again to retry.":
     "이전 시도에서 결과를 받지 못했습니다. 다시 생성하여 재시도하세요.",
   "Some transcript entries could not be saved or loaded. Keep this tab open; the session ZIP includes the transcript entries currently available here.":

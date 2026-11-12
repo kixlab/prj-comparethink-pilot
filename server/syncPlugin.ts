@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { ACCESS_ERROR, ADMIN_ERROR, accessGuard, adminGuard } from "./access";
 import { MongoSyncStore, type SyncStore } from "./syncStore";
+import { makeSttSettings } from "./sttPlugin";
+import { AutoTranscriber, type AutoTranscriberOptions } from "./autoTranscribe";
 import {
   decodeFrames,
   encodeFrames,
@@ -136,16 +138,32 @@ export function createSyncStore(
   );
 }
 
+/** Server-side transcription of uploaded sessions; on unless STT_AUTO_TRANSCRIBE=off or STT is not ready. */
+export function createAutoTranscriber(
+  env: Record<string, string | undefined>,
+  root: string,
+  store: SyncStore | null,
+  options: AutoTranscriberOptions = {},
+): AutoTranscriber | null {
+  if (!store || (env.STT_AUTO_TRANSCRIBE ?? "on").trim() === "off") return null;
+  const settings = makeSttSettings(env, root);
+  if (!settings.configuration.ready) return null;
+  return new AutoTranscriber(store, settings, options);
+}
+
 /**
  * /api/sync/* receives browser-collected sessions (add-only); /api/admin/* lets a researcher
  * with an admin key list and download them. Disabled when no store is configured.
+ * Finished uploads are transcribed on the server when STT is configured.
  */
 export function syncPlugin(
   env: Record<string, string | undefined>,
   root: string,
   injected?: SyncStore | null,
+  autoOptions: AutoTranscriberOptions & { scan?: boolean } = {},
 ): Plugin {
   const store = injected === undefined ? createSyncStore(env, root) : injected;
+  const auto = createAutoTranscriber(env, root, store, autoOptions);
   const hasAccess = accessGuard(env);
   const isAdmin = adminGuard(env);
   async function handle(req: IncomingMessage, res: ServerResponse) {
@@ -154,7 +172,10 @@ export function syncPlugin(
     const sessionId = url.searchParams.get("session_id") ?? "";
     if (path === "/api/sync/config") {
       check(req.method === "GET", "GET only");
-      return json(res, 200, { enabled: Boolean(store) });
+      return json(res, 200, {
+        enabled: Boolean(store),
+        auto_transcribe: Boolean(auto),
+      });
     }
     if (!store) throw new RequestError("Server storage is not configured", 503);
     if (path.startsWith("/api/admin/")) {
@@ -191,7 +212,9 @@ export function syncPlugin(
     if (path === "/api/sync/session") {
       const body = await readJson(req);
       check(isObject(body), "Invalid body");
-      const result = await store.putSession(validSession(body.session));
+      const session = validSession(body.session);
+      const result = await store.putSession(session);
+      auto?.schedule(session.session_id);
       return json(res, 200, { result });
     }
     if (path === "/api/sync/events") {
@@ -205,6 +228,7 @@ export function syncPlugin(
         body.session_id,
         validEvents(body.session_id, body.events),
       );
+      auto?.schedule(body.session_id);
       return json(res, 200, { added });
     }
     if (path === "/api/sync/transcriptions") {
@@ -234,6 +258,7 @@ export function syncPlugin(
       check(items.length <= MAX_BATCH, "Too many audio chunks");
       for (const { meta } of items) validAudio(sessionId, meta);
       const added = await store.addAudio(sessionId, items);
+      auto?.schedule(sessionId);
       return json(res, 200, { added });
     }
     throw new RequestError("Not found", 404);
@@ -241,6 +266,7 @@ export function syncPlugin(
   const install = (server: {
     middlewares: { use: (handler: any) => void };
   }) => {
+    if (auto && autoOptions.scan !== false) auto.start();
     server.middlewares.use(
       async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const path = req.url?.split("?")[0] ?? "";

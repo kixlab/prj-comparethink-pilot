@@ -58,6 +58,8 @@ async function ok(response: Response) {
 
 export class SyncManager {
   enabled = false;
+  /** The server transcribes uploaded recordings itself. */
+  autoTranscribe = false;
   current: string | null = null;
   private cursors = new Map<string, Cursor>();
   private states = new Map<string, SyncState>();
@@ -77,15 +79,19 @@ export class SyncManager {
   async start() {
     const generation = ++this.generation;
     let enabled = false;
+    let autoTranscribe = false;
     try {
       const response = await this.fetcher("/api/sync/config");
-      enabled = response.ok && Boolean((await response.json())?.enabled);
+      const body = response.ok ? await response.json() : null;
+      enabled = Boolean(body?.enabled);
+      autoTranscribe = enabled && Boolean(body?.auto_transcribe);
     } catch {
       enabled = false;
     }
     // stop() (or a newer start()) ran while waiting: leave no timer behind.
     if (generation !== this.generation) return false;
     this.enabled = enabled;
+    this.autoTranscribe = autoTranscribe;
     this.changed();
     if (!this.enabled) return false;
     this.timer = setInterval(() => {
@@ -333,5 +339,6 @@ export async function loadServerSnapshot(
     audio,
     transcriptions: stored.transcriptions,
     unsaved_transcription_ids: [],
+    source: "server",
   };
 }

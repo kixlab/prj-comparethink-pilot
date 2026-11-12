@@ -8,6 +8,11 @@ const { encodeFrames, decodeFrames } = await loadTsBundle(
 );
 const { syncPlugin } = await loadTsBundle("server/syncPlugin.ts", "node");
 const { MemorySyncStore } = await loadTsBundle("server/syncStore.ts", "node");
+const { AutoTranscriber } = await loadTsBundle(
+  "server/autoTranscribe.ts",
+  "node",
+);
+const { makeSttSettings } = await loadTsBundle("server/sttPlugin.ts", "node");
 const { SyncManager, listServerSessions, loadServerSnapshot } =
   await loadTsBundle("src/pilot/sync.ts", "node");
 const { Journal } = await loadTsBundle("src/pilot/storage.ts", "node");
@@ -358,8 +363,201 @@ test("storage endpoints follow the access keys: participants upload, only admin 
   const off = shim(syncPlugin({}, process.cwd(), null));
   assert.deepEqual(await (await off("/api/sync/config")).json(), {
     enabled: false,
+    auto_transcribe: false,
   });
   assert.equal((await off("/api/sync/status?session_id=x")).status, 503);
   const manager = new SyncManager(() => {}, off);
   assert.equal(await manager.start(), false);
+});
+
+// STT "ready" only needs an executable for ffmpeg; the transcription itself is faked.
+const sttEnv = {
+  STT_PROVIDER: "api",
+  STT_API_KEY: "test-key",
+  STT_API_MODEL: "whisper-1",
+  STT_API_RESPONSE_FORMAT: "verbose_json",
+  STT_FFMPEG_BIN: "/bin/sh",
+};
+const quiet = { log() {}, error() {} };
+const fakeResult = (text) => ({
+  status: "completed",
+  cues: [
+    {
+      cue_id: "cue-1",
+      text,
+      audio_start_ms: 0,
+      audio_end_ms: 500,
+      start_t_ms: 0,
+      end_t_ms: 500,
+    },
+  ],
+  untimed_text: "",
+  warnings: [],
+  duration_ms: 1000,
+  raw_result: null,
+});
+async function storeWithSession(id, { status = "completed", chunks = 2 } = {}) {
+  const store = new MemorySyncStore();
+  const session = { ...makeSession(id, chunks), status };
+  await store.putSession(session);
+  await store.addEvents(id, [
+    {
+      event_id: `${id}-e0`,
+      session_id: id,
+      sequence: 0,
+      t_ms: 0,
+      type: "session_created",
+      payload: {},
+    },
+    ...Array.from({ length: chunks }, (_, index) => ({
+      event_id: `${id}-a${index}`,
+      session_id: id,
+      sequence: index + 1,
+      t_ms: index * 1000,
+      type: "audio_chunk_received",
+      payload: { chunk_id: `${id}-c${index}`, segment_id: "seg-1", index },
+    })),
+  ]);
+  const addChunk = (index) =>
+    store.addAudio(id, [
+      {
+        meta: {
+          chunk_id: `${id}-c${index}`,
+          session_id: id,
+          segment_id: "seg-1",
+          index,
+          received_t_ms: index * 1000,
+          recorder_timecode_ms: index * 1000,
+          size: 2,
+          mime_type: "audio/webm",
+          byte_length: 2,
+        },
+        bytes: new Uint8Array([index, index]),
+      },
+    ]);
+  return { store, addChunk };
+}
+
+test("the server transcribes a finished upload by itself, waits for missing chunks, and retries failures", async () => {
+  const id = "auto-1";
+  const { store, addChunk } = await storeWithSession(id);
+  const received = [];
+  let failNext = true;
+  const auto = new AutoTranscriber(store, makeSttSettings(sttEnv, "."), {
+    log: quiet,
+    transcribe: async (_settings, bytes, startedMs) => {
+      received.push([...bytes]);
+      assert.equal(startedMs, 0);
+      if (failNext) {
+        failNext = false;
+        throw new Error("API down");
+      }
+      return fakeResult("안녕하세요");
+    },
+  });
+  // Chunk 1 is announced by an event but not uploaded yet.
+  await addChunk(0);
+  assert.equal(await auto.enqueue(id), "waiting");
+  assert.equal(received.length, 0);
+
+  await addChunk(1);
+  assert.equal(await auto.enqueue(id), "waiting", "first attempt fails");
+  assert.deepEqual(received[0], [0, 0, 1, 1], "chunks joined in order");
+  assert.equal(await auto.enqueue(id), "settled", "retry succeeds");
+  assert.equal(await auto.enqueue(id), "settled");
+  assert.equal(received.length, 2, "a completed segment is not redone");
+
+  const records = [...store.transcriptions.values()];
+  assert.deepEqual(
+    records.map((r) => r.status),
+    ["started", "failed", "started", "completed"],
+  );
+  assert.ok(records.every((r) => r.generated_by === "server"));
+  const done = records.at(-1);
+  assert.equal(done.result.cues[0].text, "안녕하세요");
+  assert.equal(done.source.bytes, 4);
+  assert.equal(done.configuration.model, "whisper-1");
+  assert.equal(done.attempt_id, records[2].attempt_id);
+  assert.notEqual(done.attempt_id, records[0].attempt_id);
+});
+
+test("automatic transcription gives up after the attempt limit and skips unfinished sessions until abandoned", async () => {
+  const failing = await storeWithSession("auto-2");
+  await failing.addChunk(0);
+  await failing.addChunk(1);
+  let calls = 0;
+  const auto = new AutoTranscriber(
+    failing.store,
+    makeSttSettings(sttEnv, "."),
+    {
+      log: quiet,
+      maxAttempts: 2,
+      transcribe: async () => {
+        calls++;
+        throw new Error("still down");
+      },
+    },
+  );
+  for (let i = 0; i < 4; i++) await auto.enqueue("auto-2");
+  assert.equal(calls, 2);
+
+  const active = await storeWithSession("auto-3", { status: "active" });
+  await active.addChunk(0);
+  await active.addChunk(1);
+  let activeCalls = 0;
+  const auto2 = new AutoTranscriber(
+    active.store,
+    makeSttSettings(sttEnv, "."),
+    {
+      log: quiet,
+      transcribe: async () => (activeCalls++, fakeResult("x")),
+    },
+  );
+  assert.equal(await auto2.enqueue("auto-3"), "waiting");
+  assert.equal(activeCalls, 0, "a running session is left alone");
+  await auto2.enqueue("auto-3", true);
+  assert.equal(activeCalls, 1, "an abandoned session is transcribed");
+});
+
+test("uploads through the sync endpoints trigger server transcription when STT is configured", async () => {
+  const store = new MemorySyncStore();
+  const id = "auto-upload";
+  await seed(id, 5, 3);
+  const texts = [];
+  const plugin = syncPlugin(sttEnv, process.cwd(), store, {
+    scan: false,
+    delayMs: 0,
+    log: quiet,
+    transcribe: async (_s, bytes) => {
+      texts.push(bytes.byteLength);
+      return fakeResult("업로드 후 자동 전사");
+    },
+  });
+  const fetcher = shim(plugin);
+  assert.deepEqual(await (await fetcher("/api/sync/config")).json(), {
+    enabled: true,
+    auto_transcribe: true,
+  });
+  const manager = new SyncManager(() => {}, fetcher);
+  assert.equal(await manager.start(), true);
+  manager.stop();
+  assert.equal(manager.autoTranscribe, true);
+  assert.equal((await manager.sync(id)).status, "synced");
+  for (let i = 0; i < 100 && store.transcriptions.size < 2; i++)
+    await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(texts, [3 + 4 + 5]);
+  const done = [...store.transcriptions.values()].find(
+    (r) => r.status === "completed",
+  );
+  assert.equal(done.session_id, id);
+  assert.equal(done.result.cues[0].text, "업로드 후 자동 전사");
+
+  // STT_AUTO_TRANSCRIBE=off keeps the browser-only flow.
+  const off = shim(
+    syncPlugin({ ...sttEnv, STT_AUTO_TRANSCRIBE: "off" }, process.cwd(), store),
+  );
+  assert.equal(
+    (await (await off("/api/sync/config")).json()).auto_transcribe,
+    false,
+  );
 });
