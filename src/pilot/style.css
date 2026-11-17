@@ -1570,3 +1570,78 @@ audio {
 .web-searches li {
   margin-bottom: 2px;
 }
+/* Rendered AI responses: markdown sets its own line breaks. */
+.message-text.rendered,
+.review-message-text.rendered {
+  white-space: normal;
+}
+.markdown {
+  line-height: 1.6;
+}
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown pre,
+.markdown blockquote,
+.markdown .markdown-table {
+  margin: 0 0 10px;
+}
+.markdown ul,
+.markdown ol {
+  padding-left: 22px;
+}
+.markdown li {
+  margin-bottom: 4px;
+}
+.markdown li > p {
+  margin-bottom: 4px;
+}
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+}
+.markdown a {
+  color: var(--blue);
+  overflow-wrap: anywhere;
+}
+.markdown code {
+  font-size: 0.9em;
+  background: #f1f2f4;
+  padding: 1px 4px;
+}
+.markdown pre {
+  background: #f1f2f4;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+}
+.markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  color: var(--muted);
+}
+.markdown .markdown-table {
+  overflow-x: auto;
+}
+.markdown table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}

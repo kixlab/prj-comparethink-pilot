@@ -10,6 +10,7 @@ import type {
 import { errorText, id, instructionsForTask, requestMicrophone } from "./types";
 import TravelTaskPanel from "./TravelTaskPanel";
 import IdeaTaskPanel from "./IdeaTaskPanel";
+import MarkdownText from "./MarkdownText";
 import { SessionEngine } from "./engine";
 import SessionReview from "./SessionReview";
 import { useI18n } from "./i18n";
@@ -163,8 +164,13 @@ function ChatMessage({
           ))}
         </ul>
       ) : null}
-      <div className="message-text">
-        {message.content ||
+      <div
+        className={`message-text${message.role === "assistant" && message.content ? " rendered" : ""}`}
+      >
+        {message.role === "assistant" && message.content ? (
+          <MarkdownText text={message.content} />
+        ) : (
+          message.content ||
           (message.status === "streaming" ? (
             <span className="waiting">
               {t("Waiting for a response")}
@@ -172,7 +178,8 @@ function ChatMessage({
             </span>
           ) : (
             t("No text was received.")
-          ))}
+          ))
+        )}
       </div>
     </article>
   );
