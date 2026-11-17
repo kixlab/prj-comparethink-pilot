@@ -36,6 +36,20 @@ export function messagesFromEvents(events: Snapshot["events"]): Message[] {
     if (event.type === "ai_first_display") m.first_display_t_ms = event.t_ms;
     if (event.type === "ai_paint_observed") m.paint_observed_t_ms = event.t_ms;
     if (event.type === "ai_text_received") m.content += String(p.text);
+    if (event.type === "ai_web_search") {
+      const callId = String(p.call_id ?? `search-${event.sequence}`);
+      m.web_searches ??= [];
+      let search = m.web_searches.find((s) => s.call_id === callId);
+      if (!search) {
+        search = { call_id: callId, status: null, action: null };
+        m.web_searches.push(search);
+      }
+      search.status = (p.status as string | null) ?? search.status;
+      search.action =
+        (p.action as Record<string, unknown> | null) ?? search.action;
+      if (p.phase === "started") search.started_t_ms = event.t_ms;
+      else search.done_t_ms = event.t_ms;
+    }
     if (["ai_completed", "ai_interrupted", "ai_failed"].includes(event.type)) {
       m.status = event.type.slice(3) as Message["status"];
       m.ended_t_ms = event.t_ms;

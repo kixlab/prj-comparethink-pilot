@@ -46,6 +46,22 @@ const upstream = async (_, options) => {
           type: "response.created",
           response: { id: "fixture-response", model: "fixture-model" },
         });
+        // The idea task enables web search; replay the provider's search item lifecycle.
+        if (body.tools?.some((tool) => tool.type === "web_search")) {
+          const item = { id: "ws_fixture", type: "web_search_call" };
+          send({
+            type: "response.output_item.added",
+            item: { ...item, status: "in_progress" },
+          });
+          send({
+            type: "response.output_item.done",
+            item: {
+              ...item,
+              status: "completed",
+              action: { type: "search", query: "human-AI collaboration 2026" },
+            },
+          });
+        }
         let i = 0;
         const tick = () => {
           if (closed) return;

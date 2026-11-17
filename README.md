@@ -1,6 +1,6 @@
 # CompareThink Pilot
 
-인간–AI 채팅과 연속 think-aloud 음성을 수집하는 웹 기반 연구 파일럿입니다. PlanBench Blocksworld와 공식 TravelPlanner 문제를 하나씩 제공하며 세션 시작 전에 선택할 수 있습니다. 원자료와 시간상의 경계를 보존하며, 프롬프트/메시지를 연구상의 move나 node로 정의하지 않습니다. 종료 후 로컬 Whisper 또는 별도 STT API로 전사하여 리뷰할 수 있습니다. 실시간 전사, 자동 node/link 분석, 학습 및 정답 채점은 포함하지 않습니다.
+인간–AI 채팅과 연속 think-aloud 음성을 수집하는 웹 기반 연구 파일럿입니다. LiveIdeaBench 기반 연구 아이디어 과제(KIXLAB 키워드 선택)와 공식 TravelPlanner 문제를 제공하며 세션 시작 전에 선택할 수 있습니다. 원자료와 시간상의 경계를 보존하며, 프롬프트/메시지를 연구상의 move나 node로 정의하지 않습니다. 종료 후 로컬 Whisper 또는 별도 STT API로 전사하여 리뷰할 수 있습니다. 실시간 전사, 자동 node/link 분석, 학습 및 정답 채점은 포함하지 않습니다.
 
 ## 실행
 
@@ -27,7 +27,7 @@ npm run preview      # http://localhost:4173, API 미들웨어 포함
 
 ## 참가자 진행
 
-상단 **Language / 언어**에서 **English / 한국어**를 선택할 수 있습니다. 선택은 이 브라우저에 유지되며 `?lang=en` / `?lang=ko` 링크로도 지정할 수 있습니다. **Session setup → Task / 세션 준비 → 과제**에서 과제를 선택하고 마이크를 확인합니다. 과제 수행 화면은 과제와 채팅 패널로 나뉩니다. 앱 버전은 `0.4.0`, Blocksworld 과제 표현 버전은 `1.2.0`, TravelPlanner 과제 버전은 `1.0.0`입니다.
+상단 **Language / 언어**에서 **English / 한국어**를 선택할 수 있습니다. 선택은 이 브라우저에 유지되며 `?lang=en` / `?lang=ko` 링크로도 지정할 수 있습니다. **Session setup → Task / 세션 준비 → 과제**에서 과제를 선택하고 마이크를 확인합니다. 과제 수행 화면은 과제와 채팅 패널로 나뉩니다. 앱 버전은 `0.4.0`, 연구 아이디어 과제 버전은 `1.0.0`, TravelPlanner 과제 버전은 `1.0.0`, (목록에서 내린) Blocksworld 과제 표현 버전은 `1.2.0`입니다.
 
 언어는 안내 화면에 진입하기 전 선택하며, 안내·과제 수행 중에는 변경하지 못합니다. 한국어 버전은 준비·안내·과제 설명·채팅 UI·종료 리뷰·음성 구간·전사 UI를 번역합니다. 사용자 메시지, 모델 응답, 전사 결과와 원본 오류 기록은 자동 번역하지 않습니다. 서버가 선택한 언어의 과제 설정을 제공하고 config ID에 고정하므로 참가자와 AI에는 같은 과제 내용이 제공됩니다. `session.json`의 `ui_language`, `config.task.language`, 실제 안내문, `task.json`의 번역문·원문·출처 변경 사항으로 제시 언어를 확인할 수 있습니다. 화면 언어와 STT 인식 언어는 별개이며 STT 언어는 서버의 `STT_LANGUAGE` 설정을 따릅니다.
 
@@ -38,7 +38,7 @@ npm run preview      # http://localhost:4173, API 미들웨어 포함
 **Back to participant setup / 참가자 준비 화면으로 돌아가기**는 목록과 리뷰를 닫고 새 익명 참가자 ID로 돌아갑니다. 새로고침 후 관리 화면을 보려면 다시 `admin`을 입력해야 합니다. 관리 화면은 현재 origin/브라우저 프로필의 IndexedDB 자료를 보는 로컬 UI 진입 구분이며 비밀번호 기반 서버 인증은 아닙니다. 기존 자료는 삭제하거나 이동하지 않습니다.
 
 1. 과제 선택 → 익명 참가자 ID 확인 → 마이크 테스트 녹음 → 재생하여 본인 목소리 확인.
-2. 선택한 과제의 안내와 think-aloud·수집 안내 확인. Blocksworld는 초기/목표 상태와 행동 규칙, TravelPlanner는 여행 요청과 제공된 여행 자료를 확인합니다.
+2. 선택한 과제의 안내와 think-aloud·수집 안내 확인. 연구 아이디어 과제는 선택한 키워드와 좋은 아이디어의 기준, TravelPlanner는 여행 요청과 제공된 여행 자료를 확인합니다.
 3. **과제 시작**을 누르면 새 마이크 스트림으로 녹음이 시작됩니다. 녹음 시작 이벤트를 확인한 뒤 과제 수행 화면을 엽니다.
 4. AI와 자유롭게 채팅합니다. 입력/대기/응답 읽기 내내 같은 MediaRecorder가 계속 녹음합니다. 강제 턴 수, 시간 제한, 특정 탐색을 유도하는 질문은 없습니다.
 5. **최종 계획 작성**에서 계획을 직접 작성하고 **최종 계획 제출 및 종료**를 누릅니다. AI 응답은 자동 제출되지 않습니다. 제출 없이 끝내면 불완전 수집으로 남습니다.
@@ -48,12 +48,23 @@ npm run preview      # http://localhost:4173, API 미들웨어 포함
 
 ## 과제 선택·출처·교체
 
-기본값은 Blocksworld입니다. 시작 화면의 **Task** 드롭다운에서 두 버전을 선택하거나 다음 링크로 과제를 미리 지정할 수 있습니다. 포트는 실제 서버 포트로 바꾸세요.
+기본값은 연구 아이디어 과제(LiveIdeaBench)입니다. 시작 화면의 **Task** 드롭다운에서 과제를 고르고, 연구 아이디어 과제는 이어서 **Keyword** 드롭다운에서 키워드를 고릅니다. 다음 링크로 미리 지정할 수도 있습니다. 포트는 실제 서버 포트로 바꾸세요.
 
-- `http://localhost:5173/?task=blocksworld`
+- `http://localhost:5173/?task=liveidea` (첫 번째 키워드)
+- `http://localhost:5173/?task=liveideabench-kixlab-computer-use-agents` (키워드 지정)
 - `http://localhost:5173/?task=travelplanner`
 
 정확한 `task_id`도 `?task=` 값으로 사용할 수 있습니다. 시작한 세션의 과제는 고정됩니다. 다른 과제로 바꾸려면 현재 세션을 종료하고 새 세션을 시작하세요. 이전 세션을 재다운로드할 때는 저장된 과제와 자료를 그대로 사용합니다.
+
+Blocksworld는 선택 목록에서 내렸습니다. 코드와 데이터는 남아 있어 `?task=blocksworld` 링크와 이전 세션 리뷰, 자동 테스트에서 계속 사용합니다. 목록 노출 여부는 [`tasks/registry.ts`](tasks/registry.ts)의 `hiddenKinds`로 정합니다.
+
+### 연구 아이디어 과제 (LiveIdeaBench 변형)
+
+- 원본: [LiveIdeaBench](https://github.com/x66ccff/liveideabench) `utils/prompts.json`의 `idea_prompt.description`, 커밋 `2070042eba169ec004eb67642c3cf96b1a7954d0`, MIT 라이선스. 논문: Ruan et al., _Nature Communications_ 17, 3625 (2026).
+- 원본은 모델에게 과학 키워드 하나를 주고 100단어 이내 아이디어를 생성시키는 벤치마크입니다. 이 과제는 **참가자가 KIXLAB 연구 주제 키워드 하나를 고르고, AI와 대화하며 아이디어를 직접 작성해 제출**하도록 바꿨습니다. 심사단·보상 문구는 빼고, 단일 키워드라는 최소 맥락과 100단어 제한, 좋은 아이디어의 네 기준(독창성·실현 가능성·명확성·중요성)은 유지했습니다.
+- 최종 아이디어는 1개입니다. 100단어(공백 기준, 한국어는 어절)를 넘으면 경고하고, 논문의 제외 기준인 200단어를 넘으면 제출을 막습니다.
+- 키워드 목록과 공통 문구는 [`tasks/liveideabench-kixlab.json`](tasks/liveideabench-kixlab.json)에 있습니다. 레지스트리가 키워드마다 과제 하나(`liveideabench-kixlab-<slug>`)로 펼치므로 키워드가 `config_id`에 고정됩니다. 키워드를 바꾸거나 추가할 때는 `version`을 올리고 한국어 표기를 [`tasks/localization.ts`](tasks/localization.ts)에 추가하세요. 키워드 자체는 두 언어 모두 영어 원문으로 AI에 전달합니다.
+- 원 벤치마크와 달리 **AI는 웹 검색(Responses API `web_search` 도구)을 쓸 수 있습니다.** 이 설정은 과제 설정과 `config_id`에 고정되며 TravelPlanner·Blocksworld에는 켜지 않습니다. 검색 단계마다 `ai_web_search` 이벤트(검색어 또는 연 URL, 시작/완료 수신 시각)를 남기고 `messages.json`의 해당 AI 메시지 `web_searches`에도 정리합니다. 채점(LLM 심사)은 포함하지 않습니다. 원본 프롬프트 전문은 `task.json`의 `original.idea_prompt`에 남습니다.
 
 ### PlanBench Blocksworld
 

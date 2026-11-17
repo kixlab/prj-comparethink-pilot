@@ -42,6 +42,18 @@ test("Korean tasks retain benchmark identities, originals and all reference valu
         korean.actions.every((a, i) => a.rule !== original.actions[i].rule),
       );
       assert.match(korean.goal_state[0], /주황.*빨강/);
+    } else if (original.kind === "liveidea") {
+      // The keyword, limits, criterion IDs and source prompt stay as given to the benchmark.
+      assert.equal(korean.keyword, original.keyword);
+      assert.deepEqual(korean.word_limit, original.word_limit);
+      assert.deepEqual(
+        korean.criteria.map((c) => c.name),
+        original.criteria.map((c) => c.name),
+      );
+      assert.ok(
+        korean.criteria.every((c, i) => c.label !== original.criteria[i].label),
+      );
+      assert.match(korean.final_instruction, /100단어 이내/);
     } else {
       assert.deepEqual(
         korean.reference_information,
@@ -66,7 +78,7 @@ test("Korean tasks retain benchmark identities, originals and all reference valu
 });
 
 test("locale fixes task, model context and the exact saved instructions together while translation never rewrites raw text", () => {
-  const original = tasks[0],
+  const original = tasks.find((task) => task.kind === "blocksworld"),
     korean = localizeTask(original, "ko");
   const env = { OPENAI_MODEL: "test-model" };
   const englishConfig = makeConfiguration(env, "test", "test", original);

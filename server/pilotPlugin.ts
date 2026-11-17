@@ -61,6 +61,16 @@ function apiKeyError(
   return null;
 }
 
+// Only the idea task may search the web; planning tasks must stay within their fixed benchmark data.
+function modelTools(task: Task) {
+  return task.kind === "liveidea" ? [{ type: "web_search" }] : undefined;
+}
+// The planning preamble is unchanged from earlier versions so those tasks keep the same model instructions.
+function systemPreamble(task: Task) {
+  if (task.kind === "liveidea")
+    return "You are collaborating with a participant on the research idea task provided below. Respond to their chat in their language. You may search the web when it helps; name the sources you rely on. The participant writes and submits their own final idea. Do not claim that a response has been submitted. No reference idea is supplied.\n\n";
+  return "You are collaborating with a participant on the planning task provided below. Respond to their chat in their language. Use only the provided task and conversation. The participant chooses and submits their final answer. Do not claim that a response has been submitted. No reference solution is supplied.\n\n";
+}
 export function makeConfiguration(
   env: Record<string, string | undefined>,
   version: string,
@@ -87,9 +97,8 @@ export function makeConfiguration(
     ...connection,
     model: env.OPENAI_MODEL?.trim() || "gpt-4.1-mini",
     generation,
-    system_prompt:
-      "You are collaborating with a participant on the planning task provided below. Respond to their chat in their language. Use only the provided task and conversation. The participant chooses and submits their final answer. Do not claim that a response has been submitted. No reference solution is supplied.\n\n" +
-      JSON.stringify(taskContext(task)),
+    ...(modelTools(task) ? { tools: modelTools(task) } : {}),
+    system_prompt: systemPreamble(task) + JSON.stringify(taskContext(task)),
     app_version: version,
     app_commit: commit,
   };
@@ -120,6 +129,7 @@ export function providerPayload(config: Configuration, messages: unknown) {
     ...config.generation,
     store: false,
     stream: true,
+    ...(config.tools ? { tools: config.tools } : {}),
     instructions: config.system_prompt,
     input: chat,
   };
@@ -287,6 +297,19 @@ export function pilotPlugin(
               event.type === "response.refusal.delta"
             )
               send({ type: "delta", text: event.delta ?? "" });
+            // Relay what the model searched and opened so the session log records it.
+            if (
+              (event.type === "response.output_item.added" ||
+                event.type === "response.output_item.done") &&
+              event.item?.type === "web_search_call"
+            )
+              send({
+                type: "web_search",
+                phase: event.type.endsWith("added") ? "started" : "done",
+                call_id: event.item.id ?? null,
+                status: event.item.status ?? null,
+                action: event.item.action ?? null,
+              });
             if (event.type === "response.completed") {
               send({
                 type: "completed",

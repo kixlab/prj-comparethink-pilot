@@ -2,17 +2,12 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { unzipSync, strFromU8 } from "fflate";
 
-async function start(page: Page, task?: "travelplanner" | "blocksworld") {
-  await page.goto("/");
-  if (task)
-    await page
-      .getByRole("combobox", { name: "Task", exact: true })
-      .selectOption({
-        label:
-          task === "travelplanner"
-            ? "TravelPlanner itinerary task"
-            : "Blocksworld planning task",
-      });
+// Blocksworld is no longer in the task menu but still opens by task link; most capture tests use it.
+async function start(
+  page: Page,
+  task: "travelplanner" | "blocksworld" | "liveidea" = "blocksworld",
+) {
+  await page.goto(`/?task=${task}`);
   await page.getByRole("button", { name: "Start microphone test" }).click();
   await expect(
     page.getByText("Test recording in progress", { exact: true }),
@@ -119,7 +114,7 @@ test("Korean selection translates the complete participant and review flow and f
   page.on("request", (r) => {
     if (r.url().includes("/api/stt/transcribe")) transcriptions++;
   });
-  await page.goto("/");
+  await page.goto("/?task=blocksworld");
   await page
     .getByRole("combobox", { name: "Language", exact: true })
     .selectOption("ko");
@@ -1429,6 +1424,8 @@ test("TravelPlanner selection supplies the same complete travel data to the part
   expect(request.instructions).not.toMatch(
     /red block|ground_truth_plan|annotated_plan/,
   );
+  expect(request.tools).toBeUndefined();
+  expect(request.instructions).not.toMatch(/search the web/);
   await page.reload();
   await enterAdmin(page);
   await expect(
@@ -1440,16 +1437,119 @@ test("TravelPlanner selection supplies the same complete travel data to the part
   expect(parsed(again, "task.json")).toEqual(task);
 });
 
+test("research idea task: the chosen keyword is fixed for participant and AI, the word limit gates submission, and export keeps the keyword", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const selection = page.getByRole("combobox", { name: "Task", exact: true });
+  await expect(selection).toHaveValue("liveidea");
+  const keyword = page.getByRole("combobox", { name: "Keyword", exact: true });
+  await expect(keyword.locator("option")).toHaveCount(9);
+  await keyword.selectOption({ label: "Computer-Use Agents" });
+  await expect(page).toHaveURL(/task=liveideabench-kixlab-computer-use-agents/);
+  await page.reload();
+  await expect(keyword).toHaveValue("liveideabench-kixlab-computer-use-agents");
+  // Switching to a kind without keywords removes the keyword choice.
+  await selection.selectOption("travelplanner");
+  await expect(keyword).toHaveCount(0);
+  await start(page, "liveidea");
+  await expect(
+    page.getByRole("heading", { name: "Research idea task", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".idea-keyword")).toContainText(
+    "Human-AI Collaboration",
+  );
+  await page
+    .getByRole("textbox", { name: "Message to AI" })
+    .fill("Help me brainstorm an idea.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(
+    page.getByRole("list", { name: "Web searches by the AI" }),
+  ).toHaveText("Searched the web: human-AI collaboration 2026");
+  await expect(
+    page.getByRole("button", { name: "Send", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Write final idea", exact: true })
+    .click();
+  const box = page.getByRole("textbox", { name: "Final idea", exact: true });
+  const submitIdea = page.getByRole("button", {
+    name: "Submit final idea and end session",
+    exact: true,
+  });
+  await box.fill(Array(150).fill("word").join(" "));
+  await expect(page.locator(".word-count")).toContainText(
+    "150 / 100 words · Longer than the 100-word target.",
+  );
+  await expect(submitIdea).toBeEnabled();
+  await box.fill(Array(201).fill("word").join(" "));
+  await expect(page.locator(".word-count")).toContainText(
+    "Over the 200-word limit",
+  );
+  await expect(submitIdea).toBeDisabled();
+  await page.screenshot({
+    path: "test-results/liveidea-desktop.png",
+    fullPage: true,
+  });
+  const idea = "A shared plan view that lets people correct an agent mid-task.";
+  await box.fill(idea);
+  await expect(page.locator(".word-count")).toHaveText("11 / 100 words");
+  await submitIdea.click();
+  await expect(
+    page.getByRole("heading", { name: "Session ended" }),
+  ).toBeVisible();
+  const files = await download(page);
+  const meta = parsed(files, "session.json"),
+    task = parsed(files, "task.json");
+  expect(meta.collection_status).toBe("complete");
+  expect(task.kind).toBe("liveidea");
+  expect(task.keyword).toBe("Human-AI Collaboration");
+  expect(task.source.commit).toBe("2070042eba169ec004eb67642c3cf96b1a7954d0");
+  expect(text(files, "final_answer.txt")).toBe(idea);
+  const requests = await (await page.request.get("/__test/requests")).json();
+  const request = requests.find((r: any) =>
+    r.input.some((m: any) => m.content === "Help me brainstorm an idea."),
+  );
+  const context = JSON.parse(request.instructions.split("\n\n").at(-1));
+  expect(context.keyword).toBe("Human-AI Collaboration");
+  expect(request.instructions).not.toMatch(/reward|review panel|red block/);
+  expect(request.tools).toEqual([{ type: "web_search" }]);
+  // Each search step is kept as a raw event and summarised on its AI message.
+  const events = text(files, "events.jsonl")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const searches = events.filter((e) => e.type === "ai_web_search");
+  expect(searches.map((e) => e.payload.phase)).toEqual(["started", "done"]);
+  expect(searches[1].payload.action).toEqual({
+    type: "search",
+    query: "human-AI collaboration 2026",
+  });
+  const reply = parsed(files, "messages.json").find(
+    (m: any) => m.role === "assistant",
+  );
+  expect(reply.web_searches).toHaveLength(1);
+  expect(reply.web_searches[0].status).toBe("completed");
+});
+
 test("task links and switching work before capture, and the server rejects a task change within a chat session", async ({
   page,
 }) => {
   const catalog = await (await page.request.get("/api/tasks")).json();
-  expect(catalog.tasks.map((t: any) => t.kind)).toEqual([
-    "blocksworld",
+  expect([...new Set(catalog.tasks.map((t: any) => t.kind))]).toEqual([
+    "liveidea",
     "travelplanner",
+    "blocksworld",
   ]);
+  expect(
+    catalog.tasks.filter((t: any) => t.hidden).map((t: any) => t.kind),
+  ).toEqual(["blocksworld"]);
   expect(JSON.stringify(catalog)).not.toContain("reference_information");
-  const block = await (await page.request.get("/api/config")).json();
+  const block = await (
+    await page.request.get(
+      "/api/config?task_id=planbench-blocksworld-task1-instance2",
+    )
+  ).json();
   const travel = await (
     await page.request.get("/api/config?task_id=travelplanner-validation-row-0")
   ).json();
@@ -1478,14 +1578,22 @@ test("task links and switching work before capture, and the server rejects a tas
   expect(changed.status()).toBe(409);
   await page.goto("/?task=travelplanner");
   const selection = page.getByRole("combobox", { name: "Task", exact: true });
-  await expect(selection).toHaveValue(travel.task.task_id);
-  await selection.selectOption(block.task.task_id);
-  await expect(page).toHaveURL(/task=blocksworld/);
+  await expect(selection).toHaveValue("travelplanner");
+  // The retired task is not offered in the menu, but its link still selects it.
+  await expect(selection.locator("option")).toHaveText([
+    "Research idea task",
+    "TravelPlanner itinerary task",
+  ]);
+  await page.goto("/?task=blocksworld");
+  await expect(selection).toHaveValue("blocksworld");
   await page.reload();
-  await expect(selection).toHaveValue(block.task.task_id);
+  await expect(selection).toHaveValue("blocksworld");
+  await selection.selectOption("travelplanner");
+  await expect(page).toHaveURL(/task=travelplanner/);
+  await expect(selection.locator("option")).toHaveCount(2);
   await page.goto("/?task=unknown");
   await expect(page.getByRole("alert")).toContainText("Unknown task");
-  await selection.selectOption(travel.task.task_id);
+  await selection.selectOption("travelplanner");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({

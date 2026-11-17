@@ -1,0 +1,73 @@
+{
+  "task_id_prefix": "liveideabench-kixlab",
+  "version": "1.0.0",
+  "title": "Research idea task",
+  "language": "en",
+  "source": {
+    "repository": "https://github.com/x66ccff/liveideabench",
+    "path": "utils/prompts.json",
+    "commit": "2070042eba169ec004eb67642c3cf96b1a7954d0",
+    "url": "https://github.com/x66ccff/liveideabench/blob/2070042eba169ec004eb67642c3cf96b1a7954d0/utils/prompts.json",
+    "file_sha256": "8aa2d48184953dbcfe340c418e69055d003cb94f86a95ce5bd8baddcbe81e11d",
+    "identifier": "idea_prompt.description",
+    "license": "MIT",
+    "license_url": "https://github.com/x66ccff/liveideabench/blob/main/LICENSE",
+    "attribution": "Ruan, K., Wang, X., Hong, J., Wang, P., Liu, Y. & Sun, H. Evaluating LLMs' divergent thinking capabilities for scientific idea generation with minimal context. Nature Communications 17, 3625 (2026). https://doi.org/10.1038/s41467-026-70245-1",
+    "changes": [
+      "Adapted the LiveIdeaBench idea-generation prompt from a model-facing prompt to a participant task: the participant writes the idea while chatting with an AI collaborator.",
+      "Replaced the benchmark's scientific keyword pool with a fixed list of KIXLAB research-topic keywords; the participant selects one keyword before the session starts.",
+      "Removed the expert review panel and reward framing; kept the single-keyword minimal context, the 100-word limit including background, and the four criteria of a good idea.",
+      "Unlike the benchmark's minimal-context setting, the AI collaborator may use web search; each search step is recorded in the session events.",
+      "Added a 200-word hard limit on the submitted idea, matching the paper's exclusion threshold; no judge scoring or feedback is applied."
+    ]
+  },
+  "description": "Write one original research idea related to the assigned keyword. You may chat with the AI while working on the task.",
+  "participant_instruction": "Read the keyword and the criteria for a good research idea. You may chat with the AI freely while developing your idea; the AI can search the web. Submit your final idea yourself when you are finished.",
+  "final_instruction": "Write one research idea related to the keyword in 100 words or fewer, including any background information. Ideas longer than 200 words cannot be submitted.",
+  "criteria": [
+    {
+      "name": "originality",
+      "label": "Original",
+      "detail": "Makes a novel contribution."
+    },
+    {
+      "name": "feasibility",
+      "label": "Feasible",
+      "detail": "Can be implemented technically."
+    },
+    {
+      "name": "clarity",
+      "label": "Clear",
+      "detail": "Is clearly articulated."
+    },
+    {
+      "name": "significance",
+      "label": "Meaningful",
+      "detail": "Addresses a meaningful problem in the field."
+    }
+  ],
+  "word_limit": { "target": 100, "max": 200 },
+  "keywords": [
+    { "slug": "human-ai-collaboration", "keyword": "Human-AI Collaboration" },
+    { "slug": "computer-use-agents", "keyword": "Computer-Use Agents" },
+    {
+      "slug": "creativity-support-tools",
+      "keyword": "Creativity Support Tools"
+    },
+    { "slug": "simulation", "keyword": "Simulation" },
+    { "slug": "ai-assisted-learning", "keyword": "AI-Assisted Learning" },
+    { "slug": "online-deliberation", "keyword": "Online Deliberation" },
+    {
+      "slug": "human-evaluation-of-llms",
+      "keyword": "Human Evaluation of LLMs"
+    },
+    {
+      "slug": "interactive-machine-learning",
+      "keyword": "Interactive Machine Learning"
+    },
+    { "slug": "accessibility", "keyword": "Accessibility" }
+  ],
+  "original": {
+    "idea_prompt": "I'll be submitting your next responses to a \"Good Scientific Idea\" expert review panel. If they consider your idea to be a good one, you'll receive a reward. Your assigned keyword is: \"{{keywords}}\". You may provide background information. The idea MUST be concisely expressed within 100 words total (including any background information). (Note: good scientific ideas should be original (novel contribution), feasible (technically implementable), clearly articulated, and address meaningful problems in the field.)."
+  }
+}

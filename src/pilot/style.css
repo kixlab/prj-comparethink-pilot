@@ -1544,3 +1544,29 @@ audio {
 .admin-panel .server-sessions {
   margin-top: 20px;
 }
+.idea-keyword strong {
+  font-size: 18px;
+  font-weight: bold;
+}
+.word-count {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.word-count.warn {
+  color: #7a5a00;
+}
+.word-count.over {
+  color: #a1260d;
+  font-weight: bold;
+}
+.web-searches {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.web-searches li {
+  margin-bottom: 2px;
+}
