@@ -5,9 +5,11 @@ import type {
   Session,
   Snapshot,
   TaskCatalog,
+  WebSearch,
 } from "./types";
 import { errorText, id, instructionsForTask, requestMicrophone } from "./types";
 import TravelTaskPanel from "./TravelTaskPanel";
+import IdeaTaskPanel from "./IdeaTaskPanel";
 import { SessionEngine } from "./engine";
 import SessionReview from "./SessionReview";
 import { useI18n } from "./i18n";
@@ -45,6 +47,7 @@ function TaskPanel({ config }: { config: Configuration }) {
   const { t } = useI18n();
   const task = config.task;
   if (task.kind === "travelplanner") return <TravelTaskPanel task={task} />;
+  if (task.kind === "liveidea") return <IdeaTaskPanel task={task} />;
   return (
     <aside className="task-panel">
       <h2>{task.title}</h2>
@@ -106,6 +109,20 @@ function TaskPanel({ config }: { config: Configuration }) {
     </aside>
   );
 }
+function webSearchLabel(search: WebSearch): [string, Record<string, string>?] {
+  const a = search.action ?? {};
+  const queries = Array.isArray(a.queries) ? a.queries.join(" · ") : "";
+  if (search.done_t_ms === undefined && search.status !== "completed")
+    return ["Searching the web…"];
+  if (a.type === "open_page" && typeof a.url === "string")
+    return ["Opened page: {url}", { url: a.url }];
+  if (a.type === "find_in_page" && typeof a.pattern === "string")
+    return ["Searched within a page: {pattern}", { pattern: a.pattern }];
+  const query = typeof a.query === "string" ? a.query : queries;
+  return query
+    ? ["Searched the web: {query}", { query }]
+    : ["Searched the web"];
+}
 function ChatMessage({
   message,
   engine,
@@ -139,6 +156,13 @@ function ChatMessage({
         <time>{seconds(message.created_t_ms)}</time>
         <span>{t(status)}</span>
       </div>
+      {message.web_searches?.length ? (
+        <ul className="web-searches" aria-label={t("Web searches by the AI")}>
+          {message.web_searches.map((search) => (
+            <li key={search.call_id}>{t(...webSearchLabel(search))}</li>
+          ))}
+        </ul>
+      ) : null}
       <div className="message-text">
         {message.content ||
           (message.status === "streaming" ? (
@@ -176,6 +200,35 @@ function ServerBackup({ state }: { state?: SyncState }) {
   );
 }
 const megabytes = (bytes: number) => `${(bytes / 1048576).toFixed(1)} MB`;
+/** Whitespace-separated words, the unit of the LiveIdeaBench length limit (eojeol in Korean). */
+const countWords = (text: string) =>
+  text.trim() ? text.trim().split(/\s+/).length : 0;
+function finalLabelsFor(kind?: string) {
+  if (kind === "liveidea")
+    return {
+      separate: "Submit your final idea separately from the chat.",
+      open: "Write final idea",
+      close: "Close final idea",
+      heading: "Final idea",
+      placeholder: "Enter your research idea.",
+      submit: "Submit final idea and end session",
+      guide: "Submit your final idea",
+      missing: "The session ended without a final idea submission.",
+    };
+  return {
+    separate: "Submit your final plan separately from the chat.",
+    open: "Write final plan",
+    close: "Close final plan",
+    heading: "Final plan",
+    placeholder:
+      kind === "travelplanner"
+        ? "Enter your day-by-day itinerary."
+        : "Enter the actions in order.",
+    submit: "Submit final plan and end session",
+    guide: "Submit your final plan",
+    missing: "The session ended without a final plan submission.",
+  };
+}
 export default function App() {
   const { language, setLanguage, t } = useI18n();
   const [admin, setAdmin] = useState(false);
@@ -211,6 +264,38 @@ export default function App() {
   const micErrors = useRef<{ at_utc: string; error: string }[]>([]);
   const chatBottom = useRef<HTMLDivElement>(null);
   const adminCandidate = participant.trim().toLowerCase() === "admin";
+  const selectedOption = catalog?.tasks.find(
+    (task) => task.task_id === selectedTaskId,
+  );
+  // One menu entry per task kind; a hidden kind is listed only while a task link has selected it.
+  const taskKinds = (catalog?.tasks ?? []).filter(
+    (task, i, all) =>
+      (!task.hidden || task.kind === selectedOption?.kind) &&
+      all.findIndex((other) => other.kind === task.kind) === i,
+  );
+  const keywordOptions = selectedOption?.keyword
+    ? (catalog?.tasks ?? []).filter(
+        (task) => task.kind === selectedOption.kind && task.keyword,
+      )
+    : [];
+  const currentTask = engine?.session.config.task ?? config?.task;
+  const finalLabels = finalLabelsFor(currentTask?.kind);
+  const wordLimit =
+    currentTask?.kind === "liveidea" ? currentTask.word_limit : null;
+  const finalWords = countWords(finalAnswer);
+  const keywordLabel = (keyword: string) =>
+    t(keyword) === keyword ? keyword : `${t(keyword)} (${keyword})`;
+  function selectTask(taskId: string) {
+    const option = catalog?.tasks.find((task) => task.task_id === taskId);
+    if (!option) return;
+    setConfig(null);
+    setError("");
+    setSelectedTaskId(taskId);
+    // Keyword variants need the exact task_id in the link; other kinds keep the short kind link.
+    const url = new URL(window.location.href);
+    url.searchParams.set("task", option.keyword ? taskId : option.kind);
+    history.replaceState(null, "", url);
+  }
   function enterAdmin() {
     if (
       !adminCandidate ||
@@ -652,41 +737,52 @@ export default function App() {
                 <select
                   id="study-task"
                   aria-label={t("Task")}
-                  value={selectedTaskId}
+                  value={selectedOption?.kind ?? ""}
                   disabled={!catalog || working || micState === "recording"}
                   onChange={(e) => {
-                    setConfig(null);
-                    setError("");
-                    setSelectedTaskId(e.target.value);
-                    const option = catalog?.tasks.find(
-                      (task) => task.task_id === e.target.value,
+                    const first = catalog?.tasks.find(
+                      (task) => task.kind === e.target.value && !task.hidden,
                     );
-                    const url = new URL(window.location.href);
-                    url.searchParams.set(
-                      "task",
-                      option?.kind ?? e.target.value,
-                    );
-                    history.replaceState(null, "", url);
+                    if (first) selectTask(first.task_id);
                   }}
                 >
-                  {!catalog || !selectedTaskId ? (
+                  {!catalog || !selectedOption ? (
                     <option value="">
                       {catalog ? t("Select a task") : t("Loading tasks…")}
                     </option>
                   ) : null}
-                  {catalog?.tasks.map((task) => (
-                    <option key={task.task_id} value={task.task_id}>
+                  {taskKinds.map((task) => (
+                    <option key={task.kind} value={task.kind}>
                       {t(task.title)}
                     </option>
                   ))}
                 </select>
                 <p className="task-summary">
-                  {t(
-                    catalog?.tasks.find(
-                      (task) => task.task_id === selectedTaskId,
-                    )?.summary ?? "",
-                  )}
+                  {t(selectedOption?.summary ?? "")}
                 </p>
+                {keywordOptions.length > 0 && (
+                  <>
+                    <label htmlFor="study-keyword">{t("Keyword")}</label>
+                    <select
+                      id="study-keyword"
+                      aria-label={t("Keyword")}
+                      value={selectedTaskId}
+                      disabled={working || micState === "recording"}
+                      onChange={(e) => selectTask(e.target.value)}
+                    >
+                      {keywordOptions.map((task) => (
+                        <option key={task.task_id} value={task.task_id}>
+                          {keywordLabel(task.keyword ?? "")}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="task-summary">
+                      {t(
+                        "Choose the keyword closest to your own research. The keyword is fixed once the task starts.",
+                      )}
+                    </p>
+                  </>
+                )}
                 <h2>{t("Microphone check")}</h2>
                 <p>
                   {t(
@@ -788,7 +884,7 @@ export default function App() {
             </div>
             <div className="instruction-card">
               <div>
-                <h3>{t("Submit your final plan")}</h3>
+                <h3>{t(finalLabels.guide)}</h3>
                 <p>{config.task.final_instruction}</p>
               </div>
             </div>
@@ -960,38 +1056,52 @@ export default function App() {
                 </div>
               </div>
               <div className="task-footer">
-                <span>
-                  {t("Submit your final plan separately from the chat.")}
-                </span>
+                <span>{t(finalLabels.separate)}</span>
                 <button
                   className="secondary"
                   onClick={() => setShowFinal(!showFinal)}
                   disabled={engine.ending}
                 >
-                  {showFinal ? t("Close final plan") : t("Write final plan")}
+                  {showFinal ? t(finalLabels.close) : t(finalLabels.open)}
                 </button>
               </div>
               {showFinal && (
                 <section className="final-panel">
-                  <h3>{t("Final plan")}</h3>
+                  <h3>{t(finalLabels.heading)}</h3>
                   <p>{engine.session.config.task.final_instruction}</p>
                   <textarea
-                    aria-label={t("Final plan")}
+                    aria-label={t(finalLabels.heading)}
                     rows={6}
                     value={finalAnswer}
                     onChange={(e) => setFinalAnswer(e.currentTarget.value)}
-                    placeholder={
-                      engine.session.config.task.kind === "travelplanner"
-                        ? t("Enter your day-by-day itinerary.")
-                        : t("Enter the actions in order.")
-                    }
+                    placeholder={t(finalLabels.placeholder)}
                   />
+                  {wordLimit && (
+                    <p
+                      className={`word-count ${finalWords > wordLimit.max ? "over" : finalWords > wordLimit.target ? "warn" : ""}`}
+                      aria-live="polite"
+                    >
+                      {t("{count} / {target} words", {
+                        count: finalWords,
+                        target: wordLimit.target,
+                      })}
+                      {finalWords > wordLimit.max
+                        ? ` · ${t("Over the {max}-word limit. Shorten your idea to submit.", { max: wordLimit.max })}`
+                        : finalWords > wordLimit.target
+                          ? ` · ${t("Longer than the {target}-word target.", { target: wordLimit.target })}`
+                          : ""}
+                    </p>
+                  )}
                   <button
                     className="primary"
-                    disabled={!finalAnswer.trim() || working}
+                    disabled={
+                      !finalAnswer.trim() ||
+                      working ||
+                      (!!wordLimit && finalWords > wordLimit.max)
+                    }
                     onClick={() => void finish(finalAnswer)}
                   >
-                    {t("Submit final plan and end session")}
+                    {t(finalLabels.submit)}
                   </button>
                 </section>
               )}
@@ -1016,7 +1126,7 @@ export default function App() {
                   ? t(
                       "Review your conversation and think-aloud recording below.",
                     )
-                  : t("The session ended without a final plan submission.")}
+                  : t(finalLabels.missing)}
               </p>
             </div>
             <div className="completion-actions">

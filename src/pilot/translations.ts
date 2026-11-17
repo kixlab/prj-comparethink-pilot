@@ -167,6 +167,33 @@ const ko: Record<string, string> = {
   "Enter your day-by-day itinerary.": "날짜별 여행 일정을 입력하세요.",
   "Enter the actions in order.": "행동을 순서대로 입력하세요.",
   "Submit final plan and end session": "최종 계획 제출 및 세션 종료",
+  "Submit your final idea separately from the chat.":
+    "최종 아이디어는 대화와 별도로 제출하세요.",
+  "Close final idea": "최종 아이디어 닫기",
+  "Write final idea": "최종 아이디어 작성",
+  "Final idea": "최종 아이디어",
+  "Enter your research idea.": "연구 아이디어를 입력하세요.",
+  "Submit final idea and end session": "최종 아이디어 제출 및 세션 종료",
+  "Submit your final idea": "최종 아이디어 제출",
+  "The session ended without a final idea submission.":
+    "최종 아이디어를 제출하지 않고 세션을 종료했습니다.",
+  "{count} / {target} words": "{count} / {target}단어",
+  "Longer than the {target}-word target.": "목표 {target}단어를 넘었습니다.",
+  "Over the {max}-word limit. Shorten your idea to submit.":
+    "{max}단어 제한을 넘었습니다. 제출하려면 아이디어를 줄이세요.",
+  Keyword: "키워드",
+  "Choose the keyword closest to your own research. The keyword is fixed once the task starts.":
+    "본인 연구와 가장 가까운 키워드를 고르세요. 과제를 시작하면 키워드를 바꿀 수 없습니다.",
+  "What makes a good research idea": "좋은 연구 아이디어의 기준",
+  "Adapted from the LiveIdeaBench idea-generation prompt. The benchmark gives a model a single keyword; here you develop the idea yourself with an AI collaborator that can search the web. No scoring or feedback is applied.":
+    "LiveIdeaBench의 아이디어 생성 프롬프트를 변형했습니다. 원래 벤치마크는 모델에게 키워드 하나를 주지만, 이 과제에서는 참가자가 웹 검색이 가능한 AI와 협업하며 직접 아이디어를 작성합니다. 채점이나 피드백은 하지 않습니다.",
+  "License: {license}.": "라이선스: {license}.",
+  "Web searches by the AI": "AI의 웹 검색",
+  "Searching the web…": "웹 검색 중…",
+  "Searched the web": "웹 검색",
+  "Searched the web: {query}": "웹 검색: {query}",
+  "Opened page: {url}": "페이지 열기: {url}",
+  "Searched within a page: {pattern}": "페이지 내 검색: {pattern}",
   "End session without submitting": "제출 없이 세션 종료",
   "Session ended": "세션 종료",
   "Review your conversation and think-aloud recording below.":

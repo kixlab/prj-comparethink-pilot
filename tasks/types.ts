@@ -46,12 +46,29 @@ export interface TravelPlannerTask extends TaskBase {
   reference_information: Record<string, TravelReference>;
   original: { query: string; fields: Record<string, unknown> };
 }
-export type Task = BlocksworldTask | TravelPlannerTask;
+export interface IdeaCriterion {
+  name: string;
+  label: string;
+  detail: string;
+}
+export interface LiveIdeaTask extends TaskBase {
+  kind: "liveidea";
+  /** Shown to the participant and the AI exactly as written, in English, in both UI languages. */
+  keyword: string;
+  criteria: IdeaCriterion[];
+  word_limit: { target: number; max: number };
+  original: { idea_prompt: string };
+}
+export type Task = BlocksworldTask | TravelPlannerTask | LiveIdeaTask;
 export interface TaskOption {
   task_id: string;
   kind: Task["kind"];
   title: string;
   summary: string;
+  /** Set for keyword variants of one task kind; the setup screen offers them as a second choice. */
+  keyword?: string;
+  /** Still served by task link (?task=…) and kept for old sessions, but not offered in the task menu. */
+  hidden?: boolean;
 }
 export interface TaskCatalog {
   default_task_id: string;

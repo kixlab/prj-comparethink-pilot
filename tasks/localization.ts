@@ -100,6 +100,34 @@ export const koTaskText: Record<string, string> = {
   OriginCityName: "출발 도시",
   DestCityName: "도착 도시",
   Distance: "거리",
+  "Research idea task": "연구 아이디어 과제",
+  "LiveIdeaBench · write one research idea from a keyword.":
+    "LiveIdeaBench · 키워드 하나로 연구 아이디어를 작성하는 과제입니다.",
+  "Write one original research idea related to the assigned keyword. You may chat with the AI while working on the task.":
+    "주어진 키워드와 관련된 독창적인 연구 아이디어 하나를 작성하세요. 과제를 수행하는 동안 AI와 대화할 수 있습니다.",
+  "Read the keyword and the criteria for a good research idea. You may chat with the AI freely while developing your idea; the AI can search the web. Submit your final idea yourself when you are finished.":
+    "키워드와 좋은 연구 아이디어의 기준을 읽으세요. 아이디어를 발전시키는 동안 AI와 자유롭게 대화할 수 있으며, AI는 웹 검색을 할 수 있습니다. 완료하면 최종 아이디어를 직접 제출하세요.",
+  "Write one research idea related to the keyword in 100 words or fewer, including any background information. Ideas longer than 200 words cannot be submitted.":
+    "키워드와 관련된 연구 아이디어 하나를 배경 설명을 포함해 100단어 이내로 작성하세요. 200단어를 넘는 아이디어는 제출할 수 없습니다.",
+  Original: "독창성",
+  "Makes a novel contribution.": "새로운 기여를 합니다.",
+  Feasible: "실현 가능성",
+  "Can be implemented technically.": "기술적으로 구현할 수 있습니다.",
+  Clear: "명확성",
+  "Is clearly articulated.": "명확하게 표현되어 있습니다.",
+  Meaningful: "중요성",
+  "Addresses a meaningful problem in the field.":
+    "해당 분야의 의미 있는 문제를 다룹니다.",
+  // Keyword names are UI glosses only; the task and the AI keep the English keyword.
+  "Human-AI Collaboration": "인간–AI 협업",
+  "Computer-Use Agents": "컴퓨터 사용 에이전트",
+  "Creativity Support Tools": "창의성 지원 도구",
+  Simulation: "시뮬레이션",
+  "AI-Assisted Learning": "AI 기반 학습 지원",
+  "Online Deliberation": "온라인 숙의",
+  "Human Evaluation of LLMs": "LLM에 대한 인간 평가",
+  "Interactive Machine Learning": "상호작용형 머신러닝",
+  Accessibility: "접근성",
 };
 
 export function localizeTask(task: Task, language: "en" | "ko"): Task {
@@ -133,6 +161,19 @@ export function localizeTask(task: Task, language: "en" | "ko"): Task {
       initial_state: task.initial_state.map(t),
       goal_state: task.goal_state.map(t),
       initial_stacks: task.initial_stacks,
+      original: task.original,
+    };
+  if (task.kind === "liveidea")
+    return {
+      ...common,
+      kind: "liveidea",
+      keyword: task.keyword,
+      criteria: task.criteria.map((c) => ({
+        ...c,
+        label: t(c.label),
+        detail: t(c.detail),
+      })),
+      word_limit: task.word_limit,
       original: task.original,
     };
   return {

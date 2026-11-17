@@ -27,6 +27,7 @@ const config = makeConfiguration(
   { OPENAI_API_KEY: "test-secret", OPENAI_MODEL: "pinned-test-model" },
   "test-version",
   "test-commit",
+  { ...task, kind: "blocksworld" },
 );
 const travelTask = JSON.parse(
   readFileSync("tasks/travelplanner-validation-row-0.json", "utf8"),
@@ -143,6 +144,85 @@ test("task-specific model context is complete, has distinct fingerprints, and ex
   });
   assert.doesNotMatch(withPrivateFields.system_prompt, /DO_NOT_FORWARD/);
 });
+test("LiveIdeaBench keyword tasks fix one keyword each, keep the benchmark prompt out of model context, and retire Blocksworld from the menu", async () => {
+  const { tasks, taskCatalog, defaultTask } = await loadTsBundle(
+    "tasks/registry.ts",
+    "node",
+  );
+  const source = JSON.parse(
+    readFileSync("tasks/liveideabench-kixlab.json", "utf8"),
+  );
+  const ideas = tasks.filter((t) => t.kind === "liveidea");
+  assert.equal(ideas.length, source.keywords.length);
+  assert.deepEqual(
+    ideas.map((t) => t.keyword),
+    source.keywords.map((k) => k.keyword),
+  );
+  assert.equal(new Set(tasks.map((t) => t.task_id)).size, tasks.length);
+  assert.equal(defaultTask.kind, "liveidea");
+  for (const t of ideas) {
+    assert.equal(t.source.instance_id, t.keyword);
+    assert.match(t.original.idea_prompt, /\{\{keywords\}\}/);
+    assert.deepEqual(t.word_limit, { target: 100, max: 200 });
+  }
+  const env = { OPENAI_API_KEY: "test-secret", OPENAI_MODEL: "pinned" };
+  const [first, second] = ideas.map((t) => makeConfiguration(env, "v", "c", t));
+  assert.notEqual(first.config_id, second.config_id);
+  const context = JSON.parse(
+    providerPayload(first, [{ role: "user", content: "hi" }])
+      .instructions.split("\n\n")
+      .at(-1),
+  );
+  assert.equal(context.kind, "liveidea");
+  assert.equal(context.keyword, ideas[0].keyword);
+  assert.deepEqual(Object.keys(context).sort(), [
+    "criteria",
+    "description",
+    "final_instruction",
+    "keyword",
+    "kind",
+    "participant_instruction",
+    "task_id",
+    "word_limit",
+  ]);
+  assert.doesNotMatch(
+    first.system_prompt,
+    /reward|review panel|file_sha256|attribution|planning task/,
+  );
+  assert.match(first.system_prompt, /research idea task/);
+  // Web search is fixed into the idea task's configuration and never offered to planning tasks.
+  assert.deepEqual(first.tools, [{ type: "web_search" }]);
+  assert.deepEqual(
+    providerPayload(first, [{ role: "user", content: "hi" }]).tools,
+    [{ type: "web_search" }],
+  );
+  for (const planning of [config, travelConfig]) {
+    assert.equal(planning.tools, undefined);
+    assert.equal(
+      "tools" in providerPayload(planning, [{ role: "user", content: "hi" }]),
+      false,
+    );
+  }
+  // Earlier tasks keep their exact model instructions.
+  assert.match(
+    config.system_prompt,
+    /^You are collaborating with a participant on the planning task provided below\. .* No reference solution is supplied\.\n\n/,
+  );
+  const listed = taskCatalog.tasks.filter((t) => !t.hidden);
+  assert.deepEqual(
+    [...new Set(listed.map((t) => t.kind))],
+    ["liveidea", "travelplanner"],
+  );
+  assert.ok(
+    taskCatalog.tasks.some((t) => t.kind === "blocksworld" && t.hidden),
+  );
+  assert.ok(
+    taskCatalog.tasks
+      .filter((t) => t.kind === "liveidea")
+      .every((t) => t.keyword),
+  );
+  assert.doesNotMatch(JSON.stringify(taskCatalog), /idea_prompt|reward/);
+});
 test("configuration is stable, fingerprints all experimental settings, and contains no API key", () => {
   assert.equal(
     config.config_id,
@@ -150,6 +230,7 @@ test("configuration is stable, fingerprints all experimental settings, and conta
       { OPENAI_API_KEY: "different", OPENAI_MODEL: "pinned-test-model" },
       "test-version",
       "test-commit",
+      config.task,
     ).config_id,
   );
   assert.notEqual(

@@ -17,6 +17,16 @@ export interface Message {
   paint_observed_t_ms?: number;
   ended_t_ms?: number;
   status: MessageStatus;
+  /** Web searches the model ran while producing this response, in call order. */
+  web_searches?: WebSearch[];
+}
+export interface WebSearch {
+  call_id: string;
+  status: string | null;
+  /** Provider action as received, e.g. {type:"search",query}, {type:"open_page",url}. */
+  action: Record<string, unknown> | null;
+  started_t_ms?: number;
+  done_t_ms?: number;
 }
 export interface RawEvent {
   event_id: string;
@@ -38,6 +48,8 @@ export interface Configuration {
     temperature?: number;
     reasoning?: { effort: string };
   };
+  /** Provider tools enabled for this task; part of the fingerprinted configuration. */
+  tools?: { type: string }[];
   system_prompt: string;
   app_version: string;
   app_commit: string;

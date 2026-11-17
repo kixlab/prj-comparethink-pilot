@@ -465,6 +465,16 @@ export class SessionEngine {
             });
           }
         }
+        if (event.type === "web_search")
+          this.log("ai_web_search", {
+            ...ids,
+            phase: event.phase,
+            call_id: event.call_id,
+            status: event.status,
+            action: event.action,
+            definition:
+              "Client receives the provider's report of a web search step (started or done); provider-side timing is not observed.",
+          });
         if (event.type === "completed") {
           this.log("ai_completed", {
             ...ids,
