@@ -16,13 +16,19 @@ const upstream = async (_, options) => {
     return new Response("fixture error", { status: 503 });
   const chunks = prompt.includes("FAIL_STREAM")
     ? ["Partial response retained."]
-    : body.instructions.includes('"kind":"travelplanner"')
+    : prompt.includes("MARKDOWN_REPLY")
       ? [
-          "I can help prepare ",
-          "a day-by-day itinerary ",
-          "using the supplied travel data.",
+          "Here is **one option**:\n\n- first *point*\n",
+          "- second point ([source](https://example.org/paper))\n\n",
+          '<img src=x onerror="window.__xss=1"> [bad](javascript:alert(1))',
         ]
-      : ["I have checked ", "the task rules ", "and current state."];
+      : body.instructions.includes('"kind":"travelplanner"')
+        ? [
+            "I can help prepare ",
+            "a day-by-day itinerary ",
+            "using the supplied travel data.",
+          ]
+        : ["I have checked ", "the task rules ", "and current state."];
   let timer;
   return new Response(
     new ReadableStream({

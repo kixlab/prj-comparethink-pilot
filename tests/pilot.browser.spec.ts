@@ -1319,6 +1319,49 @@ test("server rejects model changes and research audio fields; mobile layout has 
   });
 });
 
+test("AI markdown is rendered safely in chat and review while participant text and exports stay raw", async ({
+  page,
+}) => {
+  await start(page);
+  const input = page.getByRole("textbox", { name: "Message to AI" });
+  await input.fill("MARKDOWN_REPLY **not bold for me**");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Send", exact: true }),
+  ).toBeVisible({ timeout: 10000 });
+  const reply = page.locator("article.message.assistant .message-text");
+  await expect(reply.locator("strong")).toHaveText("one option");
+  await expect(reply.locator("em")).toHaveText("point");
+  await expect(reply.locator("li")).toHaveCount(2);
+  const link = reply.getByRole("link", { name: "source" });
+  await expect(link).toHaveAttribute("href", "https://example.org/paper");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  // Raw HTML is not rendered and unsafe link protocols are removed.
+  await expect(reply.locator("img")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__xss)).toBeUndefined();
+  await expect(reply.locator('a[href^="javascript"]')).toHaveCount(0);
+  await expect(reply).not.toContainText("**");
+  // Participant messages are shown exactly as typed.
+  await expect(page.locator("article.message.user .message-text")).toHaveText(
+    "MARKDOWN_REPLY **not bold for me**",
+  );
+  await page.screenshot({
+    path: "test-results/markdown-chat-desktop.png",
+    fullPage: true,
+  });
+  await submit(page, "Markdown display check");
+  await expect(page.locator(".review-message-text.rendered strong")).toHaveText(
+    "one option",
+  );
+  const files = await download(page);
+  const saved = parsed(files, "messages.json").find(
+    (m: any) => m.role === "assistant",
+  );
+  expect(saved.content).toContain("Here is **one option**:");
+  expect(saved.content).toContain('<img src=x onerror="window.__xss=1">');
+});
+
 test("microphone permission failure is visible and does not advance to the task", async ({
   page,
 }) => {

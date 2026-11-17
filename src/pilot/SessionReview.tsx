@@ -6,6 +6,7 @@ import { messagesFromEvents } from "./export";
 import { audioTimeline } from "./timing";
 import TranscriptionPanel from "./TranscriptionPanel";
 import AudioWindowControls from "./AudioWindowControls";
+import MarkdownText from "./MarkdownText";
 import { reviewWindows, windowPlayback } from "./reviewWindows";
 import type { ReviewWindow, WindowAudioPart } from "./reviewWindows";
 
@@ -619,9 +620,15 @@ export default function SessionReview({
                             ▶ {time(marker?.t_ms ?? message.created_t_ms)}
                           </button>
                         </div>
-                        <div className="review-message-text">
-                          {message.content ||
-                            t("No response text was received.")}
+                        <div
+                          className={`review-message-text${!human && message.content ? " rendered" : ""}`}
+                        >
+                          {!human && message.content ? (
+                            <MarkdownText text={message.content} />
+                          ) : (
+                            message.content ||
+                            t("No response text was received.")
+                          )}
                         </div>
                         {!human && (
                           <div className="review-message-footnote">
