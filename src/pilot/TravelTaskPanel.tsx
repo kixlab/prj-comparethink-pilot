@@ -1,63 +1,7 @@
 import { useI18n } from "./i18n";
-import type { TravelPlannerTask, TravelReference } from "../../tasks/types";
+import type { TravelPlannerTask } from "../../tasks/types";
+import TravelDataView from "./TravelDataView";
 
-function ReferenceSection({
-  title,
-  data,
-}: {
-  title: string;
-  data: TravelReference;
-}) {
-  const { t } = useI18n();
-  const columns =
-    typeof data === "string"
-      ? []
-      : [...new Set(data.flatMap((row) => Object.keys(row)))];
-  return (
-    <details className="travel-reference-section">
-      <summary>
-        {t(title)}
-        {Array.isArray(data) ? ` (${data.length})` : ""}
-      </summary>
-      {typeof data === "string" ? (
-        <p>{data}</p>
-      ) : data.length ? (
-        <div
-          className="reference-table-scroll"
-          tabIndex={0}
-          role="region"
-          aria-label={t("{title} table", { title: t(title) })}
-        >
-          <table>
-            <caption>{t(title)}</caption>
-            <thead>
-              <tr>
-                {columns.map((column) => (
-                  <th key={t(column)} scope="col">
-                    {t(column)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, i) => (
-                <tr key={i}>
-                  {columns.map((column) => (
-                    <td key={t(column)}>
-                      {row[column] == null ? "—" : String(row[column])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p>{t("No options were supplied for this section.")}</p>
-      )}
-    </details>
-  );
-}
 export default function TravelTaskPanel({ task }: { task: TravelPlannerTask }) {
   const { t } = useI18n();
   return (
@@ -76,14 +20,7 @@ export default function TravelTaskPanel({ task }: { task: TravelPlannerTask }) {
       </dl>
       <h3>{t("Travel data")}</h3>
       <p>{task.reference_notice}</p>
-      <p className="table-help">
-        {t("Open a section to view its options. Tables scroll horizontally.")}
-      </p>
-      <div className="travel-references" aria-label={t("Provided travel data")}>
-        {Object.entries(task.reference_information).map(([title, data]) => (
-          <ReferenceSection key={title} title={title} data={data} />
-        ))}
-      </div>
+      <TravelDataView reference={task.reference_information} />
       <h3>{t("Planning rules")}</h3>
       <ul className="state-list planning-rules">
         {task.planning_rules.map((r) => (

@@ -1652,3 +1652,113 @@ audio {
 .planning-rules ul li {
   margin-bottom: 3px;
 }
+/* TravelPlanner data view: tabs, sortable tables, wide overlay. */
+.travel-data {
+  margin-top: 10px;
+}
+.travel-data-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.travel-data-bar [role="tablist"] {
+  display: flex;
+  flex-wrap: wrap;
+}
+.travel-data-bar [role="tab"] {
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.travel-data-bar [role="tab"].active {
+  border-bottom-color: var(--blue);
+  color: inherit;
+  font-weight: bold;
+}
+.travel-data-bar button.small {
+  padding: 4px 10px;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.travel-group h4 {
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+.travel-table td.num,
+.travel-table th.num {
+  text-align: right;
+}
+.travel-table .sort-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: bold;
+  color: inherit;
+  cursor: pointer;
+}
+.travel-table .sort-button span {
+  color: var(--muted);
+  font-weight: normal;
+}
+.tag-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tag {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.travel-original {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.travel-original > summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.travel-data-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 50;
+}
+.travel-data.wide {
+  position: fixed;
+  inset: 24px;
+  z-index: 51;
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+.travel-data.wide .reference-table-scroll {
+  max-height: none;
+}
+@media (max-width: 600px) {
+  .travel-data.wide {
+    inset: 8px;
+    padding: 12px;
+  }
+}
+/* The group heading already names the table; keep the caption for screen readers only. */
+.travel-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
