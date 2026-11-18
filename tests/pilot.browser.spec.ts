@@ -1401,6 +1401,12 @@ test("TravelPlanner selection supplies the same complete travel data to the part
   await page.locator("summary").filter({ hasText: flightTitle }).click();
   const flight = page.getByRole("table", { name: flightTitle, exact: true });
   await expect(flight.getByText("F3792603", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Planning rules", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".planning-rules")).toContainText(
+    "the listed price is per night",
+  );
   await page
     .locator("summary")
     .filter({ hasText: "Restaurants in Myrtle Beach" })
@@ -1464,6 +1470,8 @@ test("TravelPlanner selection supplies the same complete travel data to the part
   const context = JSON.parse(request.instructions.split("\n\n").at(-1));
   expect(context.query).toBe(task.query);
   expect(context.reference_information).toEqual(task.reference_information);
+  expect(context.planning_rules).toEqual(task.planning_rules);
+  expect(task.version).toBe("1.1.0");
   expect(request.instructions).not.toMatch(
     /red block|ground_truth_plan|annotated_plan/,
   );

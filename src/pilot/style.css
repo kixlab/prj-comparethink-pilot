@@ -1645,3 +1645,10 @@ audio {
   padding: 4px 8px;
   text-align: left;
 }
+.planning-rules ul {
+  padding-left: 20px;
+  margin: 6px 0 0;
+}
+.planning-rules ul li {
+  margin-bottom: 3px;
+}

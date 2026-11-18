@@ -1,7 +1,7 @@
 {
   "task_id": "travelplanner-validation-row-0",
   "kind": "travelplanner",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "TravelPlanner itinerary task",
   "language": "en",
   "source": {
@@ -25,7 +25,8 @@
       "Preserved the original query, dates, travel options, and reference values; displayed dataset metadata as trip details.",
       "Adapted the official sole-planning setting for a human-AI chat study with manual itinerary submission.",
       "No worked example, annotated plan, reference solution, or evaluation feedback is included.",
-      "This is an adapted research task, not a complete TravelPlanner tool environment or leaderboard evaluation."
+      "This is an adapted research task, not a complete TravelPlanner tool environment or leaderboard evaluation.",
+      "Added planning rules shown to both participant and AI: the data is a closed benchmark sandbox, and the total cost follows get_total_cost() in the official evaluation/hard_constraint.py (OSU-NLP-Group/TravelPlanner commit ed379c497eb8e4d12a3fc988f6f1efb84982499f). Commonsense constraints are not listed."
     ]
   },
   "description": "Prepare a travel itinerary that meets the request below. You may chat with the AI while working on the task.",
@@ -684,6 +685,26 @@
     "Self-driving from Myrtle Beach to Washington": "self-driving, from Myrtle Beach to Washington, duration: 6 hours 45 mins, distance: 693 km, cost: 34",
     "Taxi from Myrtle Beach to Washington": "taxi, from Myrtle Beach to Washington, duration: 6 hours 45 mins, distance: 693 km, cost: 693"
   },
+  "planning_rules": [
+    {
+      "rule": "This is a closed benchmark scenario. Treat the supplied travel data as complete and correct for this trip. You do not need to check real-world availability, current prices, or websites."
+    },
+    {
+      "rule": "Some accommodation and restaurant names mention other places (for example, Brooklyn). The benchmark assigned them to this city, so use the City column as given."
+    },
+    {
+      "rule": "The total cost counts transportation, meals, and accommodation.",
+      "details": [
+        "Flights: the listed price per person.",
+        "Self-driving or taxi: the listed cost.",
+        "Meals: the restaurant's Average Cost per person, for each meal you include.",
+        "Accommodation: the listed price is per night; count it once for each night you stay."
+      ]
+    },
+    {
+      "rule": "Attractions and travel within the city have no cost and are not counted."
+    }
+  ],
   "final_instruction": "Write and submit your final day-by-day itinerary, including transportation, meals, attractions, and accommodation as applicable. Use the supplied travel data and stay within the requested budget and dates. AI responses are not submitted automatically.",
   "original": {
     "query": "Please create a travel plan for me where I'll be departing from Washington and heading to Myrtle Beach for a 3-day trip from March 13th to March 15th, 2022. Can you help me keep this journey within a budget of $1,400?",

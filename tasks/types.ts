@@ -44,6 +44,8 @@ export interface TravelPlannerTask extends TaskBase {
   trip_details: { label: string; value: string }[];
   reference_notice: string;
   reference_information: Record<string, TravelReference>;
+  /** Shown to the participant and the AI alike; cost rules follow the official evaluation script. */
+  planning_rules: { rule: string; details?: string[] }[];
   original: { query: string; fields: Record<string, unknown> };
 }
 export interface IdeaCriterion {

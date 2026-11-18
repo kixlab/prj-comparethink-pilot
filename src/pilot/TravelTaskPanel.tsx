@@ -84,6 +84,21 @@ export default function TravelTaskPanel({ task }: { task: TravelPlannerTask }) {
           <ReferenceSection key={title} title={title} data={data} />
         ))}
       </div>
+      <h3>{t("Planning rules")}</h3>
+      <ul className="state-list planning-rules">
+        {task.planning_rules.map((r) => (
+          <li key={r.rule}>
+            {r.rule}
+            {r.details && (
+              <ul>
+                {r.details.map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
       <h3>{t("Final itinerary")}</h3>
       <p>{task.final_instruction}</p>
       <details className="source">

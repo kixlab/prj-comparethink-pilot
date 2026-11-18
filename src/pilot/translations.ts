@@ -348,6 +348,7 @@ const ko: Record<string, string> = {
     "항목을 열면 선택지를 볼 수 있습니다. 표는 가로로 스크롤할 수 있습니다.",
   "Provided travel data": "제공된 여행 자료",
   "Final itinerary": "최종 여행 일정",
+  "Planning rules": "계획 규칙",
   "Task source and adaptation": "과제 출처와 변경 사항",
   "TravelPlanner · ": "TravelPlanner · ",
   " · row ": " · 행 ",

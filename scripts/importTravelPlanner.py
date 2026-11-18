@@ -12,6 +12,30 @@ from pathlib import Path
 import re
 import sys
 
+TASK_VERSION = "1.1.0"
+# Cost rules mirror get_total_cost() in the official evaluation script, so the task stays as close
+# to the benchmark as possible. Commonsense constraints are deliberately not listed for participants.
+EVALUATION_COMMIT = "ed379c497eb8e4d12a3fc988f6f1efb84982499f"
+RULES_CHANGE = (
+    "Added planning rules shown to both participant and AI: the data is a closed benchmark sandbox, and the total cost "
+    "follows get_total_cost() in the official evaluation/hard_constraint.py "
+    f"(OSU-NLP-Group/TravelPlanner commit {EVALUATION_COMMIT}). Commonsense constraints are not listed."
+)
+PLANNING_RULES = [
+    {"rule": "This is a closed benchmark scenario. Treat the supplied travel data as complete and correct for this trip. You do not need to check real-world availability, current prices, or websites."},
+    {"rule": "Some accommodation and restaurant names mention other places (for example, Brooklyn). The benchmark assigned them to this city, so use the City column as given."},
+    {
+        "rule": "The total cost counts transportation, meals, and accommodation.",
+        "details": [
+            "Flights: the listed price per person.",
+            "Self-driving or taxi: the listed cost.",
+            "Meals: the restaurant's Average Cost per person, for each meal you include.",
+            "Accommodation: the listed price is per night; count it once for each night you stay.",
+        ],
+    },
+    {"rule": "Attractions and travel within the city have no cost and are not counted."},
+]
+
 
 def extract(csv_path, reference_path, commit, row_index=0):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -49,7 +73,7 @@ def extract(csv_path, reference_path, commit, row_index=0):
         "level": row["level"], "local_constraint": ast.literal_eval(row["local_constraint"]),
     }
     return {
-        "task_id": f"travelplanner-validation-row-{row_index}", "kind": "travelplanner", "version": "1.0.0",
+        "task_id": f"travelplanner-validation-row-{row_index}", "kind": "travelplanner", "version": TASK_VERSION,
         "title": "TravelPlanner itinerary task", "language": "en",
         "source": {
             "repository": "https://github.com/OSU-NLP-Group/TravelPlanner",
@@ -67,6 +91,7 @@ def extract(csv_path, reference_path, commit, row_index=0):
                 "Adapted the official sole-planning setting for a human-AI chat study with manual itinerary submission.",
                 "No worked example, annotated plan, reference solution, or evaluation feedback is included.",
                 "This is an adapted research task, not a complete TravelPlanner tool environment or leaderboard evaluation.",
+                RULES_CHANGE,
             ],
         },
         "description": "Prepare a travel itinerary that meets the request below. You may chat with the AI while working on the task.",
@@ -79,6 +104,7 @@ def extract(csv_path, reference_path, commit, row_index=0):
         ],
         "reference_notice": "Use the supplied travel options for this task. The dates and prices are fixed benchmark data. All listed options are available to both you and the AI.",
         "reference_information": reference,
+        "planning_rules": PLANNING_RULES,
         "final_instruction": "Write and submit your final day-by-day itinerary, including transportation, meals, attractions, and accommodation as applicable. Use the supplied travel data and stay within the requested budget and dates. AI responses are not submitted automatically.",
         "original": {"query": row["query"], "fields": fields},
     }
