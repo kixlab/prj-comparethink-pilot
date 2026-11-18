@@ -74,5 +74,6 @@ export function taskContext(task: Task) {
     trip_details: task.trip_details,
     reference_notice: task.reference_notice,
     reference_information: task.reference_information,
+    planning_rules: task.planning_rules,
   };
 }

@@ -100,6 +100,20 @@ export const koTaskText: Record<string, string> = {
   OriginCityName: "출발 도시",
   DestCityName: "도착 도시",
   Distance: "거리",
+  "This is a closed benchmark scenario. Treat the supplied travel data as complete and correct for this trip. You do not need to check real-world availability, current prices, or websites.":
+    "이 과제는 닫힌 벤치마크 시나리오입니다. 제공된 여행 자료를 이 여행에 대한 완전하고 정확한 정보로 취급하세요. 실제 예약 가능 여부, 현재 가격, 웹사이트는 확인하지 않아도 됩니다.",
+  "Some accommodation and restaurant names mention other places (for example, Brooklyn). The benchmark assigned them to this city, so use the City column as given.":
+    "일부 숙소·식당 이름에는 다른 지역명(예: Brooklyn)이 들어 있습니다. 벤치마크가 이 도시에 배정한 것이므로 '도시' 열을 그대로 따르세요.",
+  "The total cost counts transportation, meals, and accommodation.":
+    "총비용에는 교통, 식사, 숙박이 들어갑니다.",
+  "Flights: the listed price per person.": "항공편: 표시된 1인 가격",
+  "Self-driving or taxi: the listed cost.": "자가운전·택시: 표시된 비용",
+  "Meals: the restaurant's Average Cost per person, for each meal you include.":
+    "식사: 넣은 끼니마다 해당 식당의 1인 평균 비용",
+  "Accommodation: the listed price is per night; count it once for each night you stay.":
+    "숙박: 표시 가격은 1박 기준이며, 묵는 밤 수만큼 계산",
+  "Attractions and travel within the city have no cost and are not counted.":
+    "관광지와 시내 이동은 비용이 없으며 계산에 넣지 않습니다.",
   "Research idea task": "연구 아이디어 과제",
   "LiveIdeaBench · write one research idea from a keyword.":
     "LiveIdeaBench · 키워드 하나로 연구 아이디어를 작성하는 과제입니다.",
@@ -186,6 +200,10 @@ export function localizeTask(task: Task, language: "en" | "ko"): Task {
     })),
     reference_notice: t(task.reference_notice),
     reference_information: task.reference_information,
+    planning_rules: task.planning_rules.map((r) => ({
+      rule: t(r.rule),
+      ...(r.details ? { details: r.details.map(t) } : {}),
+    })),
     original: task.original,
   };
 }

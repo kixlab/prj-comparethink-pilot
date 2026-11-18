@@ -132,6 +132,18 @@ test("task-specific model context is complete, has distinct fingerprints, and ex
     context.reference_information,
     travelTask.reference_information,
   );
+  // The same planning rules reach the AI; cost rules follow the official evaluation script.
+  assert.deepEqual(context.planning_rules, travelTask.planning_rules);
+  const rules = JSON.stringify(travelTask.planning_rules);
+  assert.match(rules, /closed benchmark scenario/);
+  assert.match(rules, /per night; count it once for each night/);
+  assert.match(rules, /Attractions and travel within the city have no cost/);
+  assert.equal(travelTask.version, "1.1.0");
+  assert.ok(
+    travelTask.source.changes.some((c) =>
+      c.includes("ed379c497eb8e4d12a3fc988f6f1efb84982499f"),
+    ),
+  );
   assert.doesNotMatch(
     payload.instructions,
     /red block|initial_stacks|reference_file_sha256/,

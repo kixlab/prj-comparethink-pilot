@@ -27,7 +27,7 @@ npm run preview      # http://localhost:4173, API 미들웨어 포함
 
 ## 참가자 진행
 
-상단 **Language / 언어**에서 **English / 한국어**를 선택할 수 있습니다. 선택은 이 브라우저에 유지되며 `?lang=en` / `?lang=ko` 링크로도 지정할 수 있습니다. **Session setup → Task / 세션 준비 → 과제**에서 과제를 선택하고 마이크를 확인합니다. 과제 수행 화면은 과제와 채팅 패널로 나뉩니다. 앱 버전은 `0.4.0`, 연구 아이디어 과제 버전은 `1.0.0`, TravelPlanner 과제 버전은 `1.0.0`, (목록에서 내린) Blocksworld 과제 표현 버전은 `1.2.0`입니다.
+상단 **Language / 언어**에서 **English / 한국어**를 선택할 수 있습니다. 선택은 이 브라우저에 유지되며 `?lang=en` / `?lang=ko` 링크로도 지정할 수 있습니다. **Session setup → Task / 세션 준비 → 과제**에서 과제를 선택하고 마이크를 확인합니다. 과제 수행 화면은 과제와 채팅 패널로 나뉩니다. 앱 버전은 `0.4.0`, 연구 아이디어 과제 버전은 `1.0.0`, TravelPlanner 과제 버전은 `1.1.0`, (목록에서 내린) Blocksworld 과제 표현 버전은 `1.2.0`입니다.
 
 언어는 안내 화면에 진입하기 전 선택하며, 안내·과제 수행 중에는 변경하지 못합니다. 한국어 버전은 준비·안내·과제 설명·채팅 UI·종료 리뷰·음성 구간·전사 UI를 번역합니다. 사용자 메시지, 모델 응답, 전사 결과와 원본 오류 기록은 자동 번역하지 않습니다. 서버가 선택한 언어의 과제 설정을 제공하고 config ID에 고정하므로 참가자와 AI에는 같은 과제 내용이 제공됩니다. `session.json`의 `ui_language`, `config.task.language`, 실제 안내문, `task.json`의 번역문·원문·출처 변경 사항으로 제시 언어를 확인할 수 있습니다. 화면 언어와 STT 인식 언어는 별개이며 STT 언어는 서버의 `STT_LANGUAGE` 설정을 따릅니다.
 
@@ -95,6 +95,7 @@ node scripts/importPlanbench.mjs /tmp/planbench.json 9bd247838ec314f048f6a37a147
 - 문제: `validation.csv`의 **row 0 (0부터 세는 행 번호)**. Washington → Myrtle Beach, 2022-03-13~15, 3일, 1명, 예산 $1,400.
 - 자료: 동일 행의 `validation_ref_info.jsonl`. 관광지 20개, 식당 28개, 숙소 19개, 왕복 항공편·자가운전·택시의 총 9개 자료 섹션을 모두 제공합니다. 표의 원본 열 이름과 값은 유지하며 행을 선별하거나 자르지 않습니다.
 - 참가자와 AI가 같은 요청·자료를 받습니다. 날짜와 가격은 원본 벤치마크의 고정 값이며 실제 예약·현재 여행 정보가 아닙니다.
+- **계획 규칙(v1.1.0)**: 참가자 화면과 AI 지시문에 같은 규칙을 넣습니다. 자료는 닫힌 벤치마크 sandbox이며 실제 예약·현재 가격을 확인할 필요가 없다는 점, 숙소·식당 이름의 다른 지역명은 무시하고 도시 열을 따른다는 점, 그리고 총비용 계산 방식입니다. 총비용은 공식 평가 코드 `evaluation/hard_constraint.py`의 `get_total_cost()`(커밋 `ed379c497eb8e4d12a3fc988f6f1efb84982499f`)를 따릅니다: 항공편 1인 가격 × 인원, 자가운전·택시 표시 비용, 식사 끼니별 평균 비용 × 인원, 숙박 1박 가격 × 숙박일. 관광지와 시내 이동은 계산하지 않습니다. 상식 제약(식당·관광지 중복 금지, 최소 숙박일 등)은 안내하지 않습니다. 규칙 문구는 [`scripts/importTravelPlanner.py`](scripts/importTravelPlanner.py)의 `PLANNING_RULES`에서 관리합니다.
 - 최종 결과는 참가자가 직접 작성한 일자별 여행 일정입니다. 예제 일정, `annotated_plan`, 참조 정답, 평가 피드백은 전달하지 않습니다.
 - `task.json`과 `session.json`에 원본 query, 자료 전체, 출처·라이선스·변경 사항·각 소스 파일 SHA-256을 보존합니다.
 - 데이터 출처: Xie et al., _TravelPlanner: A Benchmark for Real-World Planning with Language Agents_, ICML 2024. 공식 데이터셋의 라이선스는 **CC BY 4.0**입니다. 저자·출처·라이선스 링크와 변경 내역을 과제 메타데이터와 UI의 출처 설명에도 포함합니다.

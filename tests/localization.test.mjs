@@ -71,6 +71,20 @@ test("Korean tasks retain benchmark identities, originals and all reference valu
           "$1,400",
         ],
       );
+      assert.equal(
+        korean.planning_rules.length,
+        original.planning_rules.length,
+      );
+      assert.ok(
+        korean.planning_rules.every(
+          (r, i) =>
+            r.rule !== original.planning_rules[i].rule &&
+            (r.details ?? []).every(
+              (d, j) => d !== original.planning_rules[i].details[j],
+            ),
+        ),
+      );
+      assert.match(JSON.stringify(korean.planning_rules), /1박 기준/);
     }
     assert.equal(JSON.stringify(original), before);
     assert.equal(localizeTask(original, "en"), original);
