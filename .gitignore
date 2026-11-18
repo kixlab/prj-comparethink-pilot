@@ -10,3 +10,5 @@ test-results/
 playwright-report/
 .local/
 data/
+# Temporary bundle Vite writes while loading the config; it made every server start look "-dirty".
+vite.config.ts.timestamp-*
