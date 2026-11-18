@@ -283,7 +283,23 @@ test("Korean selection translates the complete participant and review flow and f
   await expect(
     page.getByRole("heading", { name: "여행 요청", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".travel-references details")).toHaveCount(9);
+  await expect(page.getByRole("tab")).toHaveText([
+    "교통",
+    "숙소",
+    "음식점",
+    "관광지",
+  ]);
+  // Every way to travel a route is compared in one table.
+  const outbound = page.getByRole("table", {
+    name: "2022-03-13 · Washington → Myrtle Beach",
+    exact: true,
+  });
+  await expect(outbound.getByRole("row")).toHaveCount(5);
+  await expect(outbound).toContainText("자가운전");
+  await expect(outbound).toContainText("6시간 47분");
+  await expect(outbound.getByText("F3792603", { exact: true })).toBeVisible();
+  // The original tables, with their original columns, stay available.
+  await page.getByText("원본 자료", { exact: true }).click();
   const title = "2022-03-13 Washington → Myrtle Beach 항공편";
   await page.locator("summary").filter({ hasText: title }).click();
   const flight = page.getByRole("table", { name: title, exact: true });
@@ -1397,25 +1413,48 @@ test("TravelPlanner selection supplies the same complete travel data to the part
     page.getByRole("combobox", { name: "Task", exact: true }),
   ).toHaveCount(0);
   await expect(page.getByText(/within a budget of \$1,400/)).toBeVisible();
-  const flightTitle = "Flight from Washington to Myrtle Beach on 2022-03-13";
-  await page.locator("summary").filter({ hasText: flightTitle }).click();
-  const flight = page.getByRole("table", { name: flightTitle, exact: true });
-  await expect(flight.getByText("F3792603", { exact: true })).toBeVisible();
+  const outbound = page.getByRole("table", {
+    name: "2022-03-13 · Washington → Myrtle Beach",
+    exact: true,
+  });
+  await expect(outbound.getByText("F3792603", { exact: true })).toBeVisible();
+  // Sorting by cost puts self-driving ($34) first; values are formatted, not changed.
+  await outbound.getByRole("button", { name: /^Cost/ }).click();
+  await expect(outbound.getByRole("row").nth(1)).toContainText("Self-driving");
+  await expect(outbound.getByRole("row").nth(1)).toContainText("$34");
   await expect(
     page.getByRole("heading", { name: "Planning rules", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".planning-rules")).toContainText(
     "the listed price is per night",
   );
-  await page
-    .locator("summary")
-    .filter({ hasText: "Restaurants in Myrtle Beach" })
-    .click();
-  await expect(
-    page
-      .getByRole("table", { name: "Restaurants in Myrtle Beach", exact: true })
-      .getByRole("row"),
-  ).toHaveCount(29);
+  await page.getByRole("tab", { name: "Restaurants", exact: true }).click();
+  const restaurants = page.getByRole("table", {
+    name: "Restaurants in Myrtle Beach",
+    exact: true,
+  });
+  await expect(restaurants.getByRole("row")).toHaveCount(29);
+  await page.getByRole("tab", { name: "Accommodations", exact: true }).click();
+  const stays = page.getByRole("table", {
+    name: "Accommodations in Myrtle Beach",
+    exact: true,
+  });
+  await expect(stays.getByRole("row")).toHaveCount(20);
+  await stays.getByRole("button", { name: /^Price per night/ }).click();
+  await expect(stays.getByRole("row").nth(1)).toContainText("$107");
+  // Websites are not offered as links in this closed scenario.
+  await page.getByRole("tab", { name: "Attractions", exact: true }).click();
+  await expect(page.locator(".travel-data a")).toHaveCount(0);
+  // The wide view shows the same data over the page and closes with Escape.
+  await page.getByRole("button", { name: "Wide view", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Travel data" })).toBeVisible();
+  await page.screenshot({
+    path: "test-results/travelplanner-wide-view.png",
+    fullPage: false,
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Transportation", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Message to AI" })
     .fill("Help me prepare the TravelPlanner itinerary.");
